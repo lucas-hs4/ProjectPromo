@@ -1,6 +1,7 @@
 from playwright.sync_api import sync_playwright
 from scraper import extrair_panini
 from database import inicializar_banco, salvar_leitura
+from notificador import enviar_alerta_ntfy
 
 MONITORAMENTO = [
     {
@@ -45,6 +46,7 @@ def executar_robo():
                 
                 if dados["disponivel"] and dados ["preco_atual"] <= preco_alvo:
                     print(f" >>> ALERTA DE COMPRA! Preço atual (R$ {dados['preco_atual']}) atingiu o alvo de R$ {preco_alvo}!")
+                    enviar_alerta_ntfy(dados, preco_alvo)
                 elif not dados["disponivel"]:
                     print(" --- Ignorado no alerta: Produto fora de estoque.")
             
