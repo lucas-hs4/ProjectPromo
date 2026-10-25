@@ -1,29 +1,18 @@
 from playwright.sync_api import sync_playwright
 from scraper import extrair_panini
-from database import inicializar_banco, salvar_leitura
+from database import inicializar_banco, salvar_leitura, atualizar_status_alerta
 from notificador import enviar_alerta_ntfy
 
-MONITORAMENTO = [
-    {
-        "url": "https://panini.com.br/surfista-prateado-escuridao-marvel-essenciais",
-        "alvo": 60.00
-    },
-    {
-        "url": "https://panini.com.br/demolidor-a-queda-de-murdock-adequ001r2",
-        "alvo": 95.00
-    },
-    {
-        "url": "https://panini.com.br/marvel-boy-marvel-essenciais",
-        "alvo": 70.00
-    },
-    {
-        "url": "https://panini.com.br/a-essencia-do-medo-marvel-essenciais",
-        "alvo": 60.00
-    },
+DESCONTO_MINIMO_PCT = 15
+
+URLS_MONITORADAS = [
+    "https://panini.com.br/surfista-prateado-escuridao-marvel-essenciais",
+    "https://panini.com.br/demolidor-a-queda-de-murdock-adequ001r2",
+    "https://panini.com.br/marvel-boy-marvel-essenciais",
+    "https://panini.com.br/a-essencia-do-medo-marvel-essenciais",
 ]
 
 def executar_robo():
-    
     inicializar_banco()
     
     with sync_playwright() as p:
@@ -37,18 +26,28 @@ def executar_robo():
         )
         pagina = contexto.new_page()
         
-        for item in MONITORAMENTO:
-            dados = extrair_panini(pagina, item["url"])
+        for url in URLS_MONITORADAS:
+            dados = extrair_panini(pagina, url)
             
             if dados:
-                prod_id, preco_alvo = salvar_leitura(dados, item["alvo"])
+                prod_id, alerta_ja_enviado = salvar_leitura(dados)
                 print(f"[DB] Salvo ID #{prod_id} | {dados['nome']} | R$ {dados['preco_atual']} {dados['desconto_pct']}% OFF | {dados['status']}")
                 
-                if dados["disponivel"] and dados ["preco_atual"] <= preco_alvo:
-                    print(f" >>> ALERTA DE COMPRA! Preço atual (R$ {dados['preco_atual']}) atingiu o alvo de R$ {preco_alvo}!")
-                    enviar_alerta_ntfy(dados, preco_alvo)
-                elif not dados["disponivel"]:
-                    print(" --- Ignorado no alerta: Produto fora de estoque.")
+                em_promocao_valida = dados["disponivel"] and dados["desconto_pct"] >= DESCONTO_MINIMO_PCT
+                
+                if em_promocao_valida:
+                    if not alerta_ja_enviado:
+                        print(f" >>> ALERTA DE COMPRA! OFERTA: R$ {dados['preco_atual']}({dados['desconto_pct']}% OFF)")
+                        enviar_alerta_ntfy(dados, DESCONTO_MINIMO_PCT)
+                        atualizar_status_alerta(prod_id, True)
+                    else:
+                        print(" === Promoção continua ativa, mas o alerta já foi enviado anteriormente.")
+                else:
+                    if alerta_ja_enviado:
+                        print(" --- A promoção acabou ou o item esgotou. Resetando trava de alerta para o futuro!")
+                        atualizar_status_alerta(prod_id, False)
+                    elif not dados["disponivel"]:
+                        print(" --- Ignorado no alerta: Produto fora de estoque.")
             
         navegador.close()
 

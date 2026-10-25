@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def enviar_alerta_ntfy(dados, preco_alvo):
+def enviar_alerta_ntfy(dados, desconto_minimo):
     """Envia uma notificação Push para o celular via ntfy.sh."""
     topico = os.getenv("NTFY_TOPICO")
     
@@ -15,9 +15,8 @@ def enviar_alerta_ntfy(dados, preco_alvo):
     url_ntfy = f"https://ntfy.sh/theproject-promo-mano-no1te"
     
     mensagem = (
-        f"Preço caiu para R$ {dados['preco_atual']:.2f} ({dados['desconto_pct']}% OFF)!\n"
-        f"Seu alvo era: R$ {preco_alvo:.2f}\n"
-        f"Preço original: R$ {dados['preco_original']:.2f}\n"
+        f"Por: R$ {dados['preco_atual']:.2f} ({dados['desconto_pct']}% OFF)"
+        f"Preço original: R$ {dados['preco_original']:.2f})\n"  
         f"Status: {dados['status']}"
     )
     

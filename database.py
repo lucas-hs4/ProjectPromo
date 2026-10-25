@@ -23,9 +23,14 @@ def inicializar_banco():
             id SERIAL PRIMARY KEY,
             nome VARCHAR(255) NOT NULL,
             url TEXT UNIQUE NOT NULL,
-            preco_alvo NUMERIC(10, 2) DEFAULT 0.00,
+            alerta_enviado BOOLEAN DEFAULT FALSE,
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+    """)
+    
+    cursor.execute("""
+        ALTER TABLE produtos
+        ADD COLUMN IF NOT EXISTS alerta_enviado BOOLEAN DEFAULT FALSE;
     """)
     
     cursor.execute("""
@@ -46,7 +51,7 @@ def inicializar_banco():
     conexao.close()
     print("Banco de dados conectados e tabelas verificadas/criadas com sucesso.")
     
-def salvar_leitura(dados, preco_alvo_inicial=0.0):
+def salvar_leitura(dados):
     """
     Cadastra ou atualiza o produto na tabela 'produtos' e 
     insere um novo registro temporal em 'historico_precos'.
@@ -55,17 +60,17 @@ def salvar_leitura(dados, preco_alvo_inicial=0.0):
     cursor = conexao.cursor()
     
     sql_produto = """
-        INSERT INTO produtos (nome, url, preco_alvo)
-        VALUES (%s, %s, %s)
+        INSERT INTO produtos (nome, url)
+        VALUES (%s, %s)
         ON CONFLICT (url) DO UPDATE
         SET nome = EXCLUDED.nome
-        RETURNING id, preco_alvo;
+        RETURNING id, alerta_enviado;
     """
-    cursor.execute(sql_produto, (dados["nome"], dados["url"], preco_alvo_inicial))
+    cursor.execute(sql_produto, (dados["nome"], dados["url"]))
     
     resultado_produto = cursor.fetchone()
     produto_id = resultado_produto[0]
-    preco_alvo_salvo = float(resultado_produto[1])
+    alerta_ja_enviado = float(resultado_produto[1])
     
     sql_historico = """
         INSERT INTO historico_precos (
@@ -87,4 +92,18 @@ def salvar_leitura(dados, preco_alvo_inicial=0.0):
     cursor.close()
     conexao.close()
     
-    return produto_id, preco_alvo_salvo
+    return produto_id, alerta_ja_enviado
+
+def atualizar_status_alerta(produto_id, status_booleano):
+    """Liga (True) ou desliga (False) a trava de notificação de um produto."""
+    conexao = conectar()
+    cursor = conexao.cursor()
+    
+    cursor.execute(
+        "UPDATE produtos SET alerta_enviado = %s WHERE id = %s;",
+        (status_booleano, produto_id)
+    )
+    
+    conexao.commit()
+    cursor.close()
+    conexao.close()
