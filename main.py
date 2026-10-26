@@ -20,7 +20,7 @@ URLS_INDIVIDUAIS = [
 def processar_produto(dados):
     """Salva o quadrinho no PostgreSQL e gerencia a trava de notificação."""
     prod_id, alerta_ja_enviada = salvar_leitura(dados)
-    print(f"[DB] ID #{prod_id} | {dados['nome']} | R$ {dados['preco_atual']:.2f} | ({dados['desconto_pct']}% OFF) | {dados['status']}")
+    print(f"[DB] [{dados.get('loja', 'Panini')}] | ID #{prod_id} | {dados['nome']} | R$ {dados['preco_atual']:.2f} | ({dados['desconto_pct']}% OFF) | {dados['status']}")
     
     em_promocao_valida = dados["disponivel"] and dados["desconto_pct"] >= DESCONTO_MINIMO_PCT
     

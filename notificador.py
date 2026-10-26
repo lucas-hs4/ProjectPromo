@@ -19,14 +19,18 @@ def enviar_alerta_ntfy(dados, desconto_minimo):
         f"Preço original: R$ {dados['preco_original']:.2f}\n"  
         f"Status: {dados['status']}"
     )
+    loja = dados.get("loja", "Panini")
     
     headers = {
-        "Title": f"Oferta: {dados['nome']}",
+        "Title": f"[{loja}] Oferta: {dados['nome']}",
         "Priority": "high",
         "Tags": "books,money_with_wings",
         "Click": dados["url"],
-        "Actions": f"view, Abrir na Panini, {dados['url']}"
+        "Actions": f"view, Abrir na {loja}, {dados['url']}"
     }
+    
+    if dados.get("imagem_url"):
+        headers["Attach"] = dados["imagem_url"]
     
     try:
         resposta = httpx.post(url_ntfy, content=mensagem.encode("utf-8"), headers=headers)

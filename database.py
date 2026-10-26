@@ -34,6 +34,16 @@ def inicializar_banco():
     """)
     
     cursor.execute("""
+        ALTER TABLE produtos
+        ADD COLUMN IF NOT EXISTS loja VARCHAR(50) DEFAULT 'Panini';
+    """)
+    
+    cursor.execute("""
+        ALTER TABLE produtos
+        ADD COLUMN IF NOT EXISTS imagem_url TEXT;
+    """)
+    
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS historico_precos (
             id SERIAL PRIMARY KEY,
             produto_id INTEGER REFERENCES produtos(id) ON DELETE CASCADE,
@@ -59,14 +69,19 @@ def salvar_leitura(dados):
     conexao = conectar()
     cursor = conexao.cursor()
     
+    loja = dados.get("loja", "Panini")
+    imagem_url = dados.get("imagem_url", "")
+    
     sql_produto = """
-        INSERT INTO produtos (nome, url)
-        VALUES (%s, %s)
+        INSERT INTO produtos (nome, url, loja, imagem_url)
+        VALUES (%s, %s, %s, %s)
         ON CONFLICT (url) DO UPDATE
-        SET nome = EXCLUDED.nome
+        SET nome = EXCLUDED.nome,
+            loja = EXCLUDED.loja,
+            imagem_url = EXCLUDED.imagem_url
         RETURNING id, alerta_enviado;
     """
-    cursor.execute(sql_produto, (dados["nome"], dados["url"]))
+    cursor.execute(sql_produto, (dados["nome"], dados["url"], loja, imagem_url))
     
     resultado_produto = cursor.fetchone()
     produto_id = resultado_produto[0]
