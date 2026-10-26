@@ -70,7 +70,7 @@ def salvar_leitura(dados):
     
     resultado_produto = cursor.fetchone()
     produto_id = resultado_produto[0]
-    alerta_ja_enviado = float(resultado_produto[1])
+    alerta_ja_enviado = resultado_produto[1]
     
     sql_historico = """
         INSERT INTO historico_precos (

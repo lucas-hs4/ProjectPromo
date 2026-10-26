@@ -12,11 +12,11 @@ def enviar_alerta_ntfy(dados, desconto_minimo):
         print("[Aviso] NTFY_TOPICO não configurado no arquivo .env.")
         return
     
-    url_ntfy = f"https://ntfy.sh/theproject-promo-mano-no1te"
+    url_ntfy = f"https://ntfy.sh/{topico}"
     
     mensagem = (
-        f"Por: R$ {dados['preco_atual']:.2f} ({dados['desconto_pct']}% OFF)"
-        f"Preço original: R$ {dados['preco_original']:.2f})\n"  
+        f"Por: R$ {dados['preco_atual']:.2f} ({dados['desconto_pct']}% OFF)\n"
+        f"Preço original: R$ {dados['preco_original']:.2f}\n"  
         f"Status: {dados['status']}"
     )
     
@@ -33,6 +33,6 @@ def enviar_alerta_ntfy(dados, desconto_minimo):
         if resposta.status_code == 200:
             print("   [Ntfy] Notificação enviada para o celular com sucesso!")
         else:
-            print("   [Ntfy] Erro ao enviar notificação. Status {resposta.status_code}")
+            print(f"   [Ntfy] Erro ao enviar notificação. Status {resposta.status_code}")
     except Exception as erro:
-        print("   [Ntfy] Falha de conexão ao enviar alerta: {erro}")
+        print(f"   [Ntfy] Falha de conexão ao enviar alerta: {erro}")
