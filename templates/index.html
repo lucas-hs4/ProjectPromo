@@ -5,27 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Radar de Promoções</title>
     <style>
-        body { font-family: sans-serif; background: #121214; color: #e1e1e6; margin: 0; padding: 20px; }
-        .topo { display: flex; gap: 15px; align-items: center; background: #202024; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; }
-        .filtros { display: flex; gap: 15px; align-items: center; background: #202024 ;padding: 15px 25px; border-radius: 8px; margin-bottom: 25px; flex-wrap: wrap; }
-        input[type="text"], input[type="number"], select { background: #121214 ; border: 1px solid #323238; color: #fff; padding: 8px 12px; border-radius: 5px; }
-        button, .btn-link { background: #e53935; color: #fff; border: none; padding: 10px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; text-decoration: none; }
-        button:hover, .btn-link:hover { background: #c62828; }
-        .btn-verde { background: #00875f; }
+        body { font-family: sans-serif; background: #09090b; color: #e1e1e6; margin: 0; padding: 20px; }
+        .topo { display: flex; justify-content: space-between; align-items: center; background: #13111c; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2e2640; }
+        .topo h2 {margin: 0; color: #c4b5fd; }
+        .filtros { display: flex; gap: 15px; align-items: center; background: #13111c ;padding: 15px 25px; border-radius: 8px; margin-bottom: 25px; flex-wrap: wrap; border: 1px solid #2e2640; }
+        input[type="text"], input[type="number"], select { background: #09090b ; border: 1px solid #4c3d6e; color: #fff; padding: 8px 12px; border-radius: 5px; outline: none; }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {border-color: #996dff; box-shadow: 0 0 5px rgba(153, 109, 255, 0.40); }
+        input[type="checkbox"] { accent-color: #8257e5; }
+        button, .btn-link { background: #8257e5; color: #fff; border: none; padding: 10px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; text-decoration: none; transition: 0.2s; }
+        button:hover, .btn-link:hover { background: #996dff; }
+        .btn-verde { background: #00875f; border: 1px solid #00b37e; }
+        .btn-verde:hover { background: #00b37e; }
         .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
-        .card { background: #202024; border-radius: 8px; padding:15px; display: flex; flex-direction: column; justify-content: space-between; position: relative; border: 1px solid #323238; }
-        .card img { width: 100%; height: 260px; object-fit: contain; background: #18181b ;border-radius: 5px; margin-bottom: 10px;}
-        .badge-desconto { position: absolute; top: 10px; right: 10px; background: #00875f ;color: #fff; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 14px; }
-        .loja-tag { font-size: 12px; color: #8d8d99; text-transform: uppercase; }
-        .titulo { font-size: 15px; margin: 8px 0; line-height: 1.3; }
+        .card { background: #13111c; border-radius: 8px; padding:15px; display: flex; flex-direction: column; justify-content: space-between; position: relative; border: 1px solid #2e2640; transition: 0.2s; }
+        .card:hover { border-color: #8257e5; transform: translateY(-2px); }
+        .card img { width: 100%; height: 260px; object-fit: contain; background: #09090b ;border-radius: 5px; margin-bottom: 10px;}
+        .badge-desconto { position: absolute; top: 10px; right: 10px; background: #00875f ;color: #fff; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+        .loja-tag { font-size: 12px; color: #a78bfa; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px; }
+        .titulo { font-size: 15px; margin: 8px 0; line-height: 1.3; color: #f4f4f5; }
         .preco-antigo { text-decoration: line-through; color: #8d8d99; font-size: 13px; }
-        .preco-atual {font-size: 20px; font-weight: bold; color: #00b37e; margin-bottom: 10px; }
-        .esgotado { opacity: 0.5; }
+        .preco-atual {font-size: 20px; font-weight: bold; color: #04d361; margin-bottom: 10px; }
+        .esgotado { opacity: 0.45; }
+        .btn-fav { position: absolute; top: 10px; left: 10px; background: rgba(19, 17, 28, 0.85); border: 1px solid #4c3d6e; color: #71717a; font-size: 18px; padding: 4px 9px; border-radius: 20px; cursor: pointer; transition: 0.2s; }
+        .btn-fav:hover { transform: scale(1.1); }
+        .btn-fav.ativo { color: #facc15; border-color: #facc15; background: rgba(250, 204, 21, 0.15); }
+        .menor-preco { font-size: 12px; color: #a78bfa; margin-bottom: 8px; }
+        .paginacao { display: flex; justify-content: center; align-items: center; gap: 15px; margin: 30px 0; }
+        .paginacao span { color: #c4b5fd; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="topo">
-        <h2>Radar de promoções ({{ ofertas|length }} itens)</h2>
+        <h2>Radar de promoções ({{ total_itens }} itens)</h2>
         <form action="/varrer" method="POST">
             {% if robo_rodando %}
                 <button type="button" disabled>Varrendo lojas em 2° plano...</button>
@@ -43,11 +54,19 @@
         <label>Categoria:
             <select name="categoria">
                 <option value="">Todos</option>
+                <option value="Mangás" {% if categoria == 'Mangás' %}selected{% endif %}>Mangás</option>
                 <option value="Marvel" {% if categoria == 'Marvel' %}selected{% endif %}>Marvel</option>
                 <option value="DC Comics" {% if categoria == 'DC Comics' %}selected{% endif %}>DC Comics</option>
-                <option value="Mangás" {% if categoria == 'Mangás' %}selected{% endif %}>Mangás</option>
                 <option value="Novels & Livros" {% if categoria == 'Novels & Livros' %}selected{% endif %}>Novels & Livros</option>
-                <option value="Panini Comics / Outros" {% if categoria == 'Panini Comics / Outros' %}selected{% endif %}>Panini Comics / Outros</option>
+                <option value="Invencível" {% if categoria == 'Invencível' %}selected{% endif %}>Invencível</option>
+                <option value="As Tartarugas Ninja" {% if categoria == 'As Tartarugas Ninja' %}selected{% endif %}>As Tartarugas Ninja</option>
+                <option value="Star Wars" {% if categoria == 'Star Wars' %}selected{% endif %}>Star Wars</option>
+                <option value="Spawn" {% if categoria == 'Spawn' %}selected{% endif %}>Spawn</option>
+                <option value="The Walking Dead" {% if categoria == 'The Walking Dead' %}selected{% endif %}>The Walking Dead</option>
+                <option value="Conan" {% if categoria == 'Conan' %}selected{% endif %}>Conan</option>
+                <option value="Turma da Mônica" {% if categoria == 'Turma da Mônica' %}selected{% endif %}>Turma da Mônica</option>
+                <option value="Disney" {% if categoria == 'Disney' %}selected{% endif %}>Disney</option>
+                <option value="Outros" {% if categoria == 'Outros' %}selected{% endif %}>Outros</option>
                 <option value="Excluídos" {% if categoria == 'Excluídos' %}selected{% endif %}>Excluídos</option>
             </select>
         </label>
@@ -65,8 +84,12 @@
             <input type="number" name="desconto_min" value="{{ desconto_min }}" min="0" max="90" style="width: 55px">
         </label>
 
+        <label>Preço Mín (R$)
+            <input type="number" step="0.01" name="preco_min" value="{{ preco_min }}" placeholder="Ex: 10.00" style="width: 75px">
+        </label>
+
         <label>Preço Máx (R$)
-            <input type="number" step="0.01" name="preco_max" value="{{ preco_max }}" placeholder="Ex: 50.00" style="width: 80px">
+            <input type="number" step="0.01" name="preco_max" value="{{ preco_max }}" placeholder="Ex: 50.00" style="width: 75px">
         </label>
 
         <label>
@@ -82,18 +105,24 @@
             Em estoque
         </label>
 
+        <label>
+            <input type="checkbox" name="favoritos" value="1" {% if apenas_fav %}checked{% endif %}>
+            ⭐ Wishlist
+        </label>
+
         <button type="submit">Filtrar</button>
     </form>
 
     <div class="grade">
         {% for item in ofertas %}
             <div class="card {% if not item.disponivel %}esgotado{% endif %}">
+                <button type="button" class="btn-fav {% if item.favorito %}ativo{% endif %}" onclick="alternarFavorito({{ item.id }}, this)" title="Adicionar/Remover da Wishlist">⭐</button>
                 {% if item.desconto_pct > 0 %}
                     <span class="badge-desconto">-{{ item.desconto_pct }}%</span>
                 {% endif %}
 
                 <div>
-                    <img src="{{ item.imagem_url }}" alt="{{ item.nome }}">
+                    <img src="{{ item.imagem_url }}" alt="{{ item.nome }}" loading="lazy">
                     <span class="loja-tag">{{ item.loja }} • {{ item.categoria }} • {{ item.status_estoque }}</span>
                     <h3 class="titulo">{{ item.nome }}</h3>
                 </div>
@@ -103,10 +132,43 @@
                         <div class="preco-antigo">De: R$ {{ "%.2f"|format(item.preco_original) }}</div>
                     {% endif %}
                     <div class="preco-atual">R$ {{ "%.2f"|format(item.preco_atual) }}</div>
+                    <div class="menor-preco">📉 Menor já visto: R$ {{ "%.2f"|format(item.menor_preco) }}></div>
                     <a href="{{ item.url }}" target="_blank" class="btn-link" style="display: block; text-align: center;">Abrir na {{ item.loja }}</a>
                 </div>
             </div>
         {% endfor %}
     </div>
+
+    {% if total_paginas > 1 %}
+    <div class="paginacao">
+        {% if pagina > 1 %}
+            <button type="button" onclick="irParaPagina({{ pagina - 1 }})">« Anterior</button>
+        {% endif %}
+
+        <span>Página {{ pagina }} de {{ total_paginas }}</span>
+
+        {% if pagina < total_paginas %}
+            <button type="button" onclick="irParaPagina({{ pagina + 1 }})">Próxima »</button>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <script>
+        document.querySelectorAll('.filtros select, .filtros input[type="checkbox"]').forEach(el => {
+            el.addEventListener('change', () => el.form.submit());
+        });
+
+        async function alternarFavorito(id, botao) {
+            const resp = await fetch(`/favoritar/${id}`, { method: 'POST' });
+            const dados = await resp.json();
+            botao.classList.toggle('ativo', dados.favorito);
+        }
+
+        function irParaPagina(numPagina) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('pagina', numPagina);
+            window.location.href = url.toString();
+        }
+    </script>
 </body>
 </html>

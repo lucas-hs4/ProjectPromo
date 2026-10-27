@@ -4,38 +4,45 @@ from database import inicializar_banco, salvar_leitura, atualizar_status_alerta
 from notificador import enviar_alerta_ntfy
 import ctypes
 
+DESCONTO_MINIMO_WISHLIST = 20
 DESCONTO_MINIMO_PCT = 70
 
 VITRINES_MONITORADAS = [
-    #"https://panini.com.br/desconto-saldao?product_list_limit=36",
-    #"https://panini.com.br/promos?product_list_limit=36",
-    #"https://panini.com.br/desconto-manga?product_list_limit=36",
-    #"https://panini.com.br/marvel?binding_description=Capa+dura&product_list_limit=36",
-    #"https://panini.com.br/dc-comics?binding_description=Capa+dura&product_list_limit=36",
+    "https://panini.com.br/marvel?product_list_limit=36",
+    "https://panini.com.br/planet-manga?product_list_limit=36",
+    "https://panini.com.br/dc-comics?product_list_limit=36",
+    "https://panini.com.br/panini-books?product_list_limit=36",
+    "https://panini.com.br/panini-comics?product_list_limit=36",
+    "https://panini.com.br/mauricio-de-sousa-catalogo?product_list_limit=36",
+    "https://panini.com.br/novidades/pre-vendas?product_list_limit=36",
+    "https://panini.com.br/novidades/reimpressao?product_list_limit=36",
+    "https://panini.com.br/desconto-saldao?product_list_limit=36",
+    "https://panini.com.br/promos?product_list_limit=36",
+    "https://panini.com.br/desconto-manga?product_list_limit=36",
     #"https://panini.com.br/planet-manga/box-mangas?product_list_limit=36",
     #"https://panini.com.br/catalogsearch/result/?q=tokyo+ghoul&product_list_limit=36",
 ]
 
 VITRINES_NEWPOP = [
-    #"https://www.lojanewpop.com.br/",
-    #"https://www.lojanewpop.com.br/mangas",
-    #"https://www.lojanewpop.com.br/livrosnovels-",
-    #"https://www.lojanewpop.com.br/marca/aca.html",
-    #"https://www.lojanewpop.com.br/marca/aventura.html"
-    #"https://www.lojanewpop.com.br/marca/classicos.html",
-    #"https://www.lojanewpop.com.br/marca/comedia.html",
-    #"https://www.lojanewpop.com.br/marca/drama.html",
-    #"https://www.lojanewpop.com.br/marca/novels.html",
-    #"https://www.lojanewpop.com.br/marca/shoujo.html",
-    #"https://www.lojanewpop.com.br/marca/suspense.html",
-    #"https://www.lojanewpop.com.br/one-shots",
+    "https://www.lojanewpop.com.br/",
+    "https://www.lojanewpop.com.br/mangas",
+    "https://www.lojanewpop.com.br/livrosnovels-",
+    "https://www.lojanewpop.com.br/marca/aca.html",
+    "https://www.lojanewpop.com.br/marca/aventura.html",
+    "https://www.lojanewpop.com.br/marca/classicos.html",
+    "https://www.lojanewpop.com.br/marca/comedia.html",
+    "https://www.lojanewpop.com.br/marca/drama.html",
+    "https://www.lojanewpop.com.br/marca/novels.html",
+    "https://www.lojanewpop.com.br/marca/shoujo.html",
+    "https://www.lojanewpop.com.br/marca/suspense.html",
+    "https://www.lojanewpop.com.br/one-shots",
 ]
 
 VITRINES_PIPOCA = [
-    #https://pipocaenanquim.com.br/promoc-o.html",S
+    "https://pipocaenanquim.com.br/promoc-o.html",
     "https://pipocaenanquim.com.br/pre-vendas.html",
-    #"https://pipocaenanquim.com.br/mangas.html",
-    #"https://pipocaenanquim.com.br/quadrinhos.html",
+    "https://pipocaenanquim.com.br/mangas.html",
+    "https://pipocaenanquim.com.br/quadrinhos.html",
 ]
 
 URLS_INDIVIDUAIS = [
@@ -44,21 +51,25 @@ URLS_INDIVIDUAIS = [
     #"https://panini.com.br/marvel-boy-marvel-essenciais",
     #"https://panini.com.br/a-essencia-do-medo-marvel-essenciais",
 ]
+
 def processar_produto(dados):
     """Salva o quadrinho no PostgreSQL e gerencia a trava de notificação."""
-    prod_id, alerta_ja_enviada = salvar_leitura(dados)
-    print(f"[DB] [{dados.get('loja', 'Panini')}] | ID #{prod_id} | {dados['nome']} | R$ {dados['preco_atual']:.2f} | ({dados['desconto_pct']}% OFF) | {dados['status']}")
+    prod_id, alerta_ja_enviada, eh_favorito = salvar_leitura(dados)
+    estrela = "⭐ " if eh_favorito else ""
+    print(f"[DB] [{dados.get('loja', 'Panini')}] | ID #{prod_id} | {estrela}{dados['nome']} | {dados['nome']} | R$ {dados['preco_atual']:.2f} | ({dados['desconto_pct']}% OFF) | {dados['status']}")
+    
+    meta_desconto = DESCONTO_MINIMO_WISHLIST if eh_favorito else DESCONTO_MINIMO_PCT
     
     em_promocao_valida = (
         dados["disponivel"] 
-        and dados["desconto_pct"] >= DESCONTO_MINIMO_PCT
+        and dados["desconto_pct"] >= meta_desconto
         and dados.get("categoria") != "Excluídos"
     )
     
     if em_promocao_valida:
         if not alerta_ja_enviada:
             print(f" >>> NOVA PROMOÇÂO ({dados['desconto_pct']}% OFF)! Disparando Alerta...")
-            enviar_alerta_ntfy(dados, DESCONTO_MINIMO_PCT)
+            enviar_alerta_ntfy(dados, meta_desconto)
             atualizar_status_alerta(prod_id, True)
         else:
             print(" === Promoção já notificada anteriormente.")
@@ -84,25 +95,27 @@ def executar_robo():
         
         pagina = contexto.new_page()
         
+        pagina.route("**/*", lambda route: route.abort() if route.request.resource_type in ["image", "media", "font"] else route.continue_())
+        
+        urls_ja_varridas = set()
+        
         for url_vitrine in VITRINES_MONITORADAS:
             lista_produtos = extrair_vitrine_panini(pagina, url_vitrine,max_paginas=100)
             for dados in lista_produtos:
+                if dados["url"] in urls_ja_varridas:
+                    continue
+                urls_ja_varridas.add(dados["url"])
                 processar_produto(dados)
-                
-        for url_vitrine in VITRINES_MONITORADAS:
-            lista_produtos = extrair_vitrine_panini(pagina, url_vitrine, max_paginas=3)
-            for dados in lista_produtos:
-                processar_produto(dados)
-                
+
         for url_newpop in VITRINES_NEWPOP:
             lista_newpop = extrair_vitrine_newpop(pagina, url_newpop, max_paginas=2)
             for dados in lista_newpop:
                 processar_produto(dados)
                 
-        for url in URLS_INDIVIDUAIS:
-            dados = extrair_panini(pagina, url)
-            if dados:
-                processar_produto(dados)
+        #for url in URLS_INDIVIDUAIS:
+            #dados = extrair_panini(pagina, url)
+            #if dados:
+                #processar_produto(dados)
                 
         for url_pipoca in VITRINES_PIPOCA:
             lista_pipoca = extrair_vitrine_pipoca(pagina, url_pipoca, max_paginas=5)

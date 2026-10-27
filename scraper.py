@@ -3,7 +3,7 @@ from playwright.sync_api import sync_playwright
 TERMOS_IGNORADOS = [
     "figurinha", "álbum", "album","cromo", "envelope",
     "adrenalyn", "fifa", "libertadores", "brasileirão",
-    "brasileirao", "copa do mundo", "seleção", "starter pack",
+    "brasileirao", "copa do mundo", "seleção da copa", "starter pack",
     "chaveiro", "pn toys"
 ]
 
@@ -54,8 +54,10 @@ def extrair_panini(pagina, url_produto):
             status_estoque = "Em estoque"
             disponivel = True
             
+        loja_nome = "Pipoca & Nanquim" if "pipocaenanquim.com.br" in url_produto else "Panini"
+            
         return {
-            "loja": "Panini",
+            "loja": loja_nome,
             "categoria": identificar_categoria(titulo, url_produto, preco_atual),
             "nome": titulo,
             "url": url_produto,
@@ -164,22 +166,35 @@ def identificar_categoria(nome, url_contexto="", preco_atual=10.0):
     """Classifica automaticamente a HQ/Mangá por Universo ou Categoria."""
     texto = f"{nome} {url_contexto}".lower()
     
-    if preco_atual < 5.0 or any(termo in texto for termo in TERMOS_IGNORADOS):
+    if preco_atual < 1.0 or any(termo in texto for termo in TERMOS_IGNORADOS):
         return "Excluídos"
     
-    if "marvel" in texto or any(h in texto for h in ["homem-aranha", "aranha", "vingadores", "x-men", "wolverine", "demolidor", "thor", "capitão américa", "hulk", "deadpool", "quarteto fantástico", "surfista prateado"]):
-        return "Marvel"
-    elif "dc+comics" in texto or "dc-comics" in texto or any(h in texto for h in ["batman", "superman", "mulher-maravilha", "liga da justiça", "flash", "lanterna verde", "asa noturna", "coringa", "sandman", "arlequina"]):
-        return "DC Comics"
-    elif "novel" in texto or "livro" in texto or "livros.html" in texto:
+    if "tartarugas ninja" in texto or "ultimo ronin" in texto or "último ronin" in texto:
+        return "As Tartarugas Ninja"
+    if "/disney" in texto or "disney" in texto or any(d in texto for d in ["mickey", "pato donald", "donald", "ducktales", "duck tales", "mickey e pateta", "tio patinhas", "minnie", "pateta"]):
+        return "Disney"
+    if "/invencivel" in texto or "invencível" in texto or "invencivel" in texto:
+        return "Invencível"
+    elif "/spawn" in texto or "spawn" in texto:
+        return "Spawn"
+    elif "/conan" in texto or "conan" in texto or "espada selvagem" in texto or "kull" in texto:
+        return "Conan"
+    elif "/star-wars" in texto or "star wars" in texto or "mandalorian" in texto or "darth vader" in texto:
+        return "Star Wars"
+    elif "/the-walking-dead" in texto or "walking dead" in texto:
+        return "The Walking Dead"
+    elif "/panini-books" in texto or "novel" in texto or "livro" in texto or "livros.html" in texto or "livrosnovels" in texto:
         return "Novels & Livros"
-    elif "planet+manga" in texto or "planet-manga" in texto or "lojanewpop" in texto or "mangas.html" in texto or any(m in texto for m in ["junji ito", "shigurui", "city hunter", "cat's eye", "cats eye", "chushingura", "battle royale"]):
+    elif "/marvel" in texto or any(h in texto for h in ["homem-aranha","homem de ferro", "viúva negra", "viuva negra", "viúva-negra", "aranha", "vingadores", "x-men", "wolverine", "demolidor", "thor", "capitão américa", "capitao américa", "hulk", "deadpool", "quarteto fantástico", "surfista prateado"]):
+        return "Marvel"
+    elif "/dc-comics" in texto or "dc+comics" in texto or any(h in texto for h in ["batman", "superman", "mulher-maravilha", "liga da justiça", "flash", "lanterna verde", "asa noturna", "coringa", "sandman", "arlequina", "watchmen", "juízo final", "heróis em crise", "herois em crise", "robin", "shazam"]):
+        return "DC Comics"
+    elif "/planet-manga" in texto or "planet+manga" in texto or "lojanewpop" in texto or "mangas.html" in texto or any(m in texto for m in ["junji ito", "shigurui", "city hunter", "cat's eye", "cats eye", "chushingura", "battle royale", "one piece", "berserk", "naruto", "dragon ball", "demon slayer", "jujutsu", "tokyo ghoul", "chainsaw man"]):
         return "Mangás"
-    elif "mauricio" in texto or "mônica" in texto or "monica" in texto or "cebolinha" in texto or "cascão" in texto or "magali" in texto:
+    elif "/mauricio-de-sousa-catalogo" in texto or "mauricio" in texto or "mônica" in texto or "monica" in texto or "cebolinha" in texto or "cascão" in texto or "magali" in texto or "chico bento" in texto or "xaveco" in texto or "tina" in texto or "saiba mais" in texto:
         return "Turma da Mônica"
     else:
-        return "Panini Comics / Outros"
-
+        return "Outros"
 
 def limpar_preco_br(texto):
     """Converte 'R$ 84,90' para o float 84.90."""
@@ -190,7 +205,6 @@ def limpar_preco_br(texto):
         return float(limpo)
     except ValueError:
         return 0.0
-
 
 def extrair_vitrine_newpop(pagina, url_inicial, max_paginas=2):
     """
@@ -381,15 +395,16 @@ def extrair_vitrine_pipoca(pagina, url_inicial, max_paginas=100):
         print(f"\n[Pipoca & Nanquim] Varrendo Página {pagina_num}: {url_atual}...")
         
         try:
-            resposta = pagina.goto(url_atual, wait_until="domcontentloaded")
+            resposta = pagina.goto(url_atual, wait_until="commit", timeout=60000)
             if resposta.status != 200:
                 print(f"Erro ao acessar Pipoca & Nanquim. Status: {resposta.status}")
                 break
+            pagina.wait_for_selector("div.products-grid, ol.widget-product-carousel", timeout=30000)
         except Exception as erro:
             print(f"   [Erro de Rede] Falha em Pipoca & Nanquim: {erro}")
             break
         
-        cards = pagina.locator("ol.product-items div.product-item-info")
+        cards = pagina.locator("div.products-grid div.product-item-info, ol.widget-product-carousel div.product-item-info")
         total_cards = cards.count()
         print(f"Encontrados {total_cards} cards nessa página.")
         
