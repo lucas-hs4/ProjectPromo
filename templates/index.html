@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar de Promoções</title>
+    <style>
+        body { font-family: sans-serif; background: #121214; color: #e1e1e6; margin: 0; padding: 20px; }
+        .topo { display: flex; gap: 15px; align-items: center; background: #202024; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; }
+        .filtros { display: flex; gap: 15px; align-items: center; background: #202024 ;padding: 15px 25px; border-radius: 8px; margin-bottom: 25px; flex-wrap: wrap; }
+        input[type="text"], input[type="number"], select { background: #121214 ; border: 1px solid #323238; color: #fff; padding: 8px 12px; border-radius: 5px; }
+        button, .btn-link { background: #e53935; color: #fff; border: none; padding: 10px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; text-decoration: none; }
+        button:hover, .btn-link:hover { background: #c62828; }
+        .btn-verde { background: #00875f; }
+        .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+        .card { background: #202024; border-radius: 8px; padding:15px; display: flex; flex-direction: column; justify-content: space-between; position: relative; border: 1px solid #323238; }
+        .card img { width: 100%; height: 260px; object-fit: contain; background: #18181b ;border-radius: 5px; margin-bottom: 10px;}
+        .badge-desconto { position: absolute; top: 10px; right: 10px; background: #00875f ;color: #fff; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 14px; }
+        .loja-tag { font-size: 12px; color: #8d8d99; text-transform: uppercase; }
+        .titulo { font-size: 15px; margin: 8px 0; line-height: 1.3; }
+        .preco-antigo { text-decoration: line-through; color: #8d8d99; font-size: 13px; }
+        .preco-atual {font-size: 20px; font-weight: bold; color: #00b37e; margin-bottom: 10px; }
+        .esgotado { opacity: 0.5; }
+    </style>
+</head>
+<body>
+    <div class="topo">
+        <h2>Radar de promoções ({{ ofertas|length }} itens)</h2>
+        <form action="/varrer" method="POST">
+            {% if robo_rodando %}
+                <button type="button" disabled>Varrendo lojas em 2° plano...</button>
+            {% else %}
+                <button type="submit" class="btn-verde"> Disparar Varredura agora</button>
+            {% endif %}
+        </form>
+    </div>
+
+    <form class="filtros" method="GET" action="/">
+        <label>Buscar Obra:
+            <input type="text" name="busca" value="{{ busca }}" placeholder="Ex: Demolidor, Marvel...">
+        </label>
+
+        <label>Categoria:
+            <select name="categoria">
+                <option value="">Todos</option>
+                <option value="Marvel" {% if categoria == 'Marvel' %}selected{% endif %}>Marvel</option>
+                <option value="DC Comics" {% if categoria == 'DC Comics' %}selected{% endif %}>DC Comics</option>
+                <option value="Mangás" {% if categoria == 'Mangás' %}selected{% endif %}>Mangás</option>
+                <option value="Novels & Livros" {% if categoria == 'Novels & Livros' %}selected{% endif %}>Novels & Livros</option>
+                <option value="Panini Comics / Outros" {% if categoria == 'Panini Comics / Outros' %}selected{% endif %}>Panini Comics / Outros</option>
+                <option value="Excluídos" {% if categoria == 'Excluídos' %}selected{% endif %}>Excluídos</option>
+            </select>
+        </label>
+        
+        <label>Loja:
+            <select name="loja">
+                <option value="">Todas</option>
+                <option value="Panini" {% if loja == 'Panini' %}selected{% endif %}>Panini</option>
+                <option value="NewPOP" {% if loja == 'NewPOP' %}selected{% endif %}>NewPOP</option>
+                <option value="Pipoca & Nanquim" {% if loja == 'Pipoca & Nanquim' %}selected{% endif %}>Pipoca & Nanquim</option>
+            </select>
+        </label>
+
+        <label>Desconto Mínimo (%):
+            <input type="number" name="desconto_min" value="{{ desconto_min }}" min="0" max="90" style="width: 55px">
+        </label>
+
+        <label>Preço Máx (R$)
+            <input type="number" step="0.01" name="preco_max" value="{{ preco_max }}" placeholder="Ex: 50.00" style="width: 80px">
+        </label>
+
+        <label>
+            <select name="ordem">
+                <option value="desconto" {% if ordem == 'desconto' %}selected{% endif %}>Maior % Desconto</option>
+                <option value="preco_menor" {% if ordem == 'preco_menor' %}selected{% endif %}>Menor Preço (R$)</option>
+                <option value="nome" {% if ordem == 'nome' %}selected{% endif %}>Nome (A-Z)</option>
+            </select>
+        </label>
+
+        <label>
+            <input type="checkbox" name="disponiveis" value="1" {% if apenas_disp %}checked{% endif %}>
+            Em estoque
+        </label>
+
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <div class="grade">
+        {% for item in ofertas %}
+            <div class="card {% if not item.disponivel %}esgotado{% endif %}">
+                {% if item.desconto_pct > 0 %}
+                    <span class="badge-desconto">-{{ item.desconto_pct }}%</span>
+                {% endif %}
+
+                <div>
+                    <img src="{{ item.imagem_url }}" alt="{{ item.nome }}">
+                    <span class="loja-tag">{{ item.loja }} • {{ item.categoria }} • {{ item.status_estoque }}</span>
+                    <h3 class="titulo">{{ item.nome }}</h3>
+                </div>
+
+                <div>
+                    {% if item.preco_original > item.preco_atual %}
+                        <div class="preco-antigo">De: R$ {{ "%.2f"|format(item.preco_original) }}</div>
+                    {% endif %}
+                    <div class="preco-atual">R$ {{ "%.2f"|format(item.preco_atual) }}</div>
+                    <a href="{{ item.url }}" target="_blank" class="btn-link" style="display: block; text-align: center;">Abrir na {{ item.loja }}</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

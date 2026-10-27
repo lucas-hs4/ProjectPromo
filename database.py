@@ -1,5 +1,6 @@
 import os
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -43,6 +44,13 @@ def inicializar_banco():
         ADD COLUMN IF NOT EXISTS imagem_url TEXT;
     """)
     
+    cursor.execute("CREATE EXTENSION IF NOT EXISTS unaccent;")
+    
+    cursor.execute("""
+        ALTER TABLE produtos
+        ADD COLUMN IF NOT EXISTS categoria VARCHAR(50) DEFAULT 'Geral';
+    """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS historico_precos (
             id SERIAL PRIMARY KEY,
@@ -71,17 +79,19 @@ def salvar_leitura(dados):
     
     loja = dados.get("loja", "Panini")
     imagem_url = dados.get("imagem_url", "")
+    categoria = dados.get("categoria", "Geral")
     
     sql_produto = """
-        INSERT INTO produtos (nome, url, loja, imagem_url)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO produtos (nome, url, loja, imagem_url, categoria)
+        VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (url) DO UPDATE
         SET nome = EXCLUDED.nome,
             loja = EXCLUDED.loja,
-            imagem_url = EXCLUDED.imagem_url
+            imagem_url = EXCLUDED.imagem_url,
+            categoria = EXCLUDED.categoria
         RETURNING id, alerta_enviado;
     """
-    cursor.execute(sql_produto, (dados["nome"], dados["url"], loja, imagem_url))
+    cursor.execute(sql_produto, (dados["nome"], dados["url"], loja, imagem_url, categoria))
     
     resultado_produto = cursor.fetchone()
     produto_id = resultado_produto[0]
@@ -122,3 +132,57 @@ def atualizar_status_alerta(produto_id, status_booleano):
     conexao.commit()
     cursor.close()
     conexao.close()
+    
+def listar_ofertas(desconto_min=0, preco_max=0.0, busca="", loja="", categoria="", apenas_disponiveis=False, ordem="desconto"):
+    """
+    Busca todos os produtos com sua leitura mais recente,
+    aplicando filtros de desconto, nome e estoque.
+    """
+    conexao = conectar()
+    cursor = conexao.cursor(cursor_factory=RealDictCursor)
+    
+    sql = """
+        SELECT * FROM (
+            SELECT DISTINCT ON (p.id)
+                p.id, p.nome, p.url, p.loja, p.imagem_url, p.categoria,
+                h.preco_original, h.preco_atual, h.desconto_pct,
+                h.status_estoque, h.disponivel, h.data_consulta
+            FROM produtos p
+            JOIN historico_precos h ON p.id = h.produto_id
+            ORDER BY p.id, h.data_consulta DESC
+        ) AS ultimas_leituras
+        WHERE desconto_pct >= %s
+          AND unaccent(nome) ILIKE unaccent(%s)
+    """
+    parametros = [desconto_min, f"%{busca}%"]
+    
+    if preco_max > 0:
+        sql += " AND preco_atual <= %s"
+        parametros.append(preco_max)
+    
+    if loja:
+        sql += " AND loja = %s"
+        parametros.append(loja)
+    
+    if categoria:
+        sql += " AND categoria = %s"
+        parametros.append(categoria)
+    else:
+        sql += " AND categoria != 'Excluídos'"
+        
+    if apenas_disponiveis:
+        sql += " AND disponivel = TRUE"
+        
+    if ordem == "preco_menor":
+        sql += " ORDER BY preco_atual ASC, desconto_pct DESC;"
+    elif ordem == "nome":
+        sql += " ORDER BY nome ASC;"
+    else:
+        sql += " ORDER BY desconto_pct DESC, preco_atual ASC;"
+
+    cursor.execute(sql,tuple(parametros))
+    produtos = cursor.fetchall()
+    
+    cursor.close()
+    conexao.close()
+    return produtos
