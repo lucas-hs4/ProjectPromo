@@ -37,13 +37,17 @@
 <body>
     <div class="topo">
         <h2>Radar de promoções ({{ total_itens }} itens)</h2>
-        <form action="/varrer" method="POST">
-            {% if robo_rodando %}
-                <button type="button" disabled>Varrendo lojas em 2° plano...</button>
-            {% else %}
-                <button type="submit" class="btn-verde"> Disparar Varredura agora</button>
-            {% endif %}
-        </form>
+        {% if robo_rodando %}
+            <form action="/parar" method="POST" style="display: flex; gap: 10px; align-items: center;">
+                <span>Varrendo lojas em 2° plano...</span>
+                <button type="submit" style="background: #e53935;">🛑 Parar Varredura</button>
+            </form>
+        {% else %}
+            <form action="/varrer" method="POST" style="display: flex; gap: 10px;">
+                <button type="submit" name="modo" value="rapido" class="btn-verde">⚡ Varredura Rápida</button>
+                <button type="submit" name="modo" value="completo">🔄 Varredura Completa</button>
+            </form>
+        {% endif %}
     </div>
 
     <form class="filtros" method="GET" action="/">
@@ -110,7 +114,17 @@
             ⭐ Wishlist
         </label>
 
-        <button type="submit">Filtrar</button>
+        <label>Exibir:
+            <select name="por_pagina">
+                <option value="50" {% if por_pagina == 50 %}selected{% endif %}>50 itens</option>
+                <option value="200" {% if por_pagina == 200 %}selected{% endif %}>200 itens</option>
+                <option value="1000" {% if por_pagina == 1000 %}selected{% endif %}> 1000 itens</option>
+                <option value="100000" {% if por_pagina == 100000 %}selected{% endif %}>Todos</option>
+            </select>
+        </label>
+
+        <button type="submit" style="display: none;">Filtrar</button>
+        <a href="/" class="btn-link" style="background: #2e2640;">Limpar</a>
     </form>
 
     <div class="grade">
@@ -132,7 +146,7 @@
                         <div class="preco-antigo">De: R$ {{ "%.2f"|format(item.preco_original) }}</div>
                     {% endif %}
                     <div class="preco-atual">R$ {{ "%.2f"|format(item.preco_atual) }}</div>
-                    <div class="menor-preco">📉 Menor já visto: R$ {{ "%.2f"|format(item.menor_preco) }}></div>
+                    <div class="menor-preco">📉 Menor já visto: R$ {{ "%.2f"|format(item.menor_preco) }}</div>
                     <a href="{{ item.url }}" target="_blank" class="btn-link" style="display: block; text-align: center;">Abrir na {{ item.loja }}</a>
                 </div>
             </div>
@@ -169,6 +183,14 @@
             url.searchParams.set('pagina', numPagina);
             window.location.href = url.toString();
         }
+
+        {% if robo_rodando %}
+        setInterval(async () => {
+            const r = await fetch('/status_robo');
+            const st = await r.json();
+            if (!st.rodando) window.location.reload();
+        }, 30000);
+        {% endif %}
     </script>
 </body>
 </html>

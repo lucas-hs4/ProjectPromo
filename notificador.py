@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def enviar_alerta_ntfy(dados, desconto_minimo):
+def enviar_alerta_ntfy(dados, desconto_minimo, eh_favorito=False):
     """Envia uma notificação Push para o celular via ntfy.sh."""
     topico = os.getenv("NTFY_TOPICO")
     
@@ -12,28 +12,31 @@ def enviar_alerta_ntfy(dados, desconto_minimo):
         print("[Aviso] NTFY_TOPICO não configurado no arquivo .env.")
         return
     
-    url_ntfy = f"https://ntfy.sh/{topico}"
-    
     mensagem = (
         f"Por: R$ {dados['preco_atual']:.2f} ({dados['desconto_pct']}% OFF)\n"
         f"Preço original: R$ {dados['preco_original']:.2f}\n"  
         f"Status: {dados['status']}"
     )
     loja = dados.get("loja", "Panini")
+    titulo_alerta = "⭐ [WISHLIST]" if eh_favorito else f"[{loja}] Oferta: {dados['nome']}"
     
-    headers = {
-        "Title": f"[{loja}] Oferta: {dados['nome']}",
-        "Priority": "high",
-        "Tags": "books,money_with_wings",
-        "Click": dados["url"],
-        "Actions": f"view, Abrir na {loja}, {dados['url']}"
+    payload = {
+        "topic": topico,
+        "title": titulo_alerta,
+        "mensagem": mensagem,
+        "priority": 5 if eh_favorito else 4,
+        "tags": ["star", "books"] if eh_favorito else ["books,money_with_wings"],
+        "click": dados["url"],
+        "actions": [
+            {"action": "view", "label": f"Abrir na {loja}", "url": dados["url"]}
+        ]
     }
     
     if dados.get("imagem_url"):
-        headers["Attach"] = dados["imagem_url"]
+        payload["Attach"] = dados["imagem_url"]
     
     try:
-        resposta = httpx.post(url_ntfy, content=mensagem.encode("utf-8"), headers=headers)
+        resposta = httpx.post("https://ntfy.sh", json=payload, timeout=15.0)
         if resposta.status_code == 200:
             print("   [Ntfy] Notificação enviada para o celular com sucesso!")
         else:

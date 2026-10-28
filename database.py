@@ -84,6 +84,13 @@ def inicializar_banco():
         ADD COLUMN IF NOT EXISTS favorito BOOLEAN DEFAULT FALSE;
     """)
     
+    cursor.execute("""
+        ALTER TABLE produtos
+        ADD COLUMN IF NOT EXISTS ultimo_alerta TIMESTAMP;
+    """)
+    
+    cursor.execute("UPDATE produtos SET categoria = 'Mangás' WHERE loja = 'NewPOP' AND categoria = 'Excluídos';")
+    
     #for prod_id, nome, url, preco in cursor.fetchall():
         #nova_cat = identificar_categoria(nome, url, float(preco))
         #cursor.execute("UPDATE produtos SET categoria = %s WHERE id = %s;", (nova_cat, prod_id))
@@ -99,12 +106,14 @@ def inicializar_banco():
     conexao.close()
     print("Banco de dados conectados e tabelas verificadas/criadas com sucesso.")
     
-def salvar_leitura(dados):
+def salvar_leitura(dados, conexao=None):
     """
     Cadastra ou atualiza o produto na tabela 'produtos' e 
     insere um novo registro temporal em 'historico_precos'.
     """
-    conexao = conectar()
+    fechar_ao_final = conexao is None
+    if fechar_ao_final:
+        conexao = conectar()
     cursor = conexao.cursor()
     
     loja = dados.get("loja", "Panini")
@@ -127,7 +136,7 @@ def salvar_leitura(dados):
                 THEN produtos.categoria
                 ELSE EXCLUDED.categoria
             END
-        RETURNING id, alerta_enviado, favorito;
+        RETURNING id, (alerta_enviado AND ultimo_alerta IS NOT NULL AND ultimo_alerta > NOW() - INTERVAL '3 days'), favorito;
     """
     cursor.execute(sql_produto, (dados["nome"], dados["url"], loja, imagem_url, categoria))
     
@@ -173,7 +182,8 @@ def salvar_leitura(dados):
     
     conexao.commit()
     cursor.close()
-    conexao.close()
+    if fechar_ao_final:
+        conexao.close()
     
     return produto_id, alerta_ja_enviado, eh_favorito
 
@@ -182,10 +192,13 @@ def atualizar_status_alerta(produto_id, status_booleano):
     conexao = conectar()
     cursor = conexao.cursor()
     
-    cursor.execute(
-        "UPDATE produtos SET alerta_enviado = %s WHERE id = %s;",
-        (status_booleano, produto_id)
-    )
+    cursor.execute("""
+        UPDATE produtos
+        SET alerta_enviado = %s,
+            ultimo_alerta = CASE WHEN %s = TRUE THEN CURRENT_TIMESTAMP ELSE ultimo_alerta END
+        WHERE id = %s;
+    """, (status_booleano, status_booleano, produto_id))
+    
     
     conexao.commit()
     cursor.close()
@@ -274,3 +287,13 @@ def alternar_favorito(produto_id):
     cursor.close()
     conexao.close()
     return novo_status
+
+def listar_urls_favoritos():
+    """Retorna a lista de URLs de todos os produtos marcados na Wishlist."""
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("SELECT url FROM produtos WHERE favorito = TRUE;")
+    urls = [linha[0] for linha in cursor.fetchall()]
+    cursor.close()
+    conexao.close()
+    return urls

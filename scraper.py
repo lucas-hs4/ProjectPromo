@@ -1,5 +1,7 @@
 from playwright.sync_api import sync_playwright
 
+cancelar_varredura = False
+
 TERMOS_IGNORADOS = [
     "figurinha", "álbum", "album","cromo", "envelope",
     "adrenalyn", "fifa", "libertadores", "brasileirão",
@@ -72,7 +74,7 @@ def extrair_panini(pagina, url_produto):
         print(f"   [Erro] Falha ao ler produto {url_produto}: {erro}")
         return None
 
-def extrair_vitrine_panini(pagina, url_inicial, max_paginas=100):
+def extrair_vitrine_panini(pagina, url_inicial, max_paginas=100, urls_vistas=None):
     """
     Crawler de Categoria: entra na vitrine, extrai todos o cards da grade
     e avança para as próximas páginas sozinho até atingir 'max_paginas'.
@@ -81,14 +83,23 @@ def extrair_vitrine_panini(pagina, url_inicial, max_paginas=100):
     url_atual = url_inicial
     pagina_num = 1
     produtos_extraidos = []
+    if urls_vistas is None:
+        urls_vistas = set()
     
     while url_atual and pagina_num <= max_paginas:
+        if cancelar_varredura:
+            print("   [Parada] Varredura interrompida pelo usuário.")
+            break
         print(f"[Crawler] Varrendo Página {pagina_num}: {url_atual}...")
     
-        resposta = pagina.goto(url_atual, wait_until="domcontentloaded")
-    
-        if resposta.status != 200:
-            print(f"Erro ao acessar a vitrine. Status: {resposta.status}")
+        try:
+            resposta = pagina.goto(url_atual, wait_until="commit", timeout=60000)
+            if resposta.status != 200:
+                print(f"Erro ao acessar a vitrine. Status: {resposta.status}")
+                break
+            pagina.wait_for_selector("div.products-grid", timeout=30000)
+        except Exception as erro:
+            print(f"   [Erro de Rede] Pulo na Página {pagina_num} da Panini: {erro}")
             break
     
         cards = pagina.locator("div.products-grid div.product-item-info")
@@ -105,6 +116,10 @@ def extrair_vitrine_panini(pagina, url_inicial, max_paginas=100):
         
                 nome = link_elemento.inner_text().strip()
                 url_produto = link_elemento.get_attribute("href")
+                
+                if url_produto in urls_vistas:
+                    continue
+                urls_vistas.add(url_produto)
                 
                 img_elemento = card.locator("img.product-image-photo").first
                 imagem_url = img_elemento.get_attribute("src") if img_elemento.count() > 0 else ""
@@ -125,12 +140,11 @@ def extrair_vitrine_panini(pagina, url_inicial, max_paginas=100):
 
                 tem_botao_compra = card.locator("button.tocart").count() > 0
                 fora_de_estoque = card.locator(".stock.unavailable").count() > 0
-                texto_card = card.inner_text()
                 
                 if fora_de_estoque or not tem_botao_compra:
                     status_estoque = "Indisponível"
                     disponivel = False
-                elif "Pré-venda" in texto_card or card.locator(".infobase-label-presale").count() > 0:
+                elif card.locator(".infobase-label-presale").count() > 0 or "Pré-venda" in card.inner_text():
                     status_estoque = "Pré-venda"
                     disponivel = True
                 else: 
@@ -166,7 +180,7 @@ def identificar_categoria(nome, url_contexto="", preco_atual=10.0):
     """Classifica automaticamente a HQ/Mangá por Universo ou Categoria."""
     texto = f"{nome} {url_contexto}".lower()
     
-    if preco_atual < 1.0 or any(termo in texto for termo in TERMOS_IGNORADOS):
+    if 0 < preco_atual < 1.0 or any(termo in texto for termo in TERMOS_IGNORADOS):
         return "Excluídos"
     
     if "tartarugas ninja" in texto or "ultimo ronin" in texto or "último ronin" in texto:
@@ -206,14 +220,16 @@ def limpar_preco_br(texto):
     except ValueError:
         return 0.0
 
-def extrair_vitrine_newpop(pagina, url_inicial, max_paginas=2):
+def extrair_vitrine_newpop(pagina, url_inicial, max_paginas=2,urls_vistas=None):
     """
     Crawler para a NewPOP (Loja Integrada) com captura de capa e categoria.
     """
     url_atual = url_inicial
     pagina_num = 1
     produtos_extraidos = []
-
+    if urls_vistas is None:
+        urls_vistas = set()
+        
     while url_atual and pagina_num <= max_paginas:
         print(f"\n[NewPOP] Varrendo Página {pagina_num}: {url_atual}...")
 
@@ -240,12 +256,14 @@ def extrair_vitrine_newpop(pagina, url_inicial, max_paginas=2):
 
                 nome = link_el.inner_text().strip()
                 url_produto = link_el.get_attribute("href")
+                
+                if url_produto in urls_vistas:
+                    continue
+                urls_vistas.add(url_produto)
 
-                # Captura a capa na NewPOP
                 img_el = card.locator("img.imagem-principal").first
                 imagem_url = img_el.get_attribute("src") if img_el.count() > 0 else ""
 
-                # Preço Atual
                 loc_promo = card.locator("strong.preco-promocional").first
                 loc_normal = card.locator("strong.preco-venda").first
 
@@ -257,8 +275,7 @@ def extrair_vitrine_newpop(pagina, url_inicial, max_paginas=2):
                     preco_atual = float(attr_preco) if attr_preco else limpar_preco_br(loc_normal.inner_text())
                 else:
                     preco_atual = 0.0
-
-                # Preço Original (Riscado)
+                    
                 loc_antigo = card.locator("s.preco-venda").first
                 if loc_antigo.count() > 0:
                     preco_original = limpar_preco_br(loc_antigo.inner_text())
@@ -267,7 +284,6 @@ def extrair_vitrine_newpop(pagina, url_inicial, max_paginas=2):
 
                 desconto_pct = round(((preco_original - preco_atual) / preco_original) * 100) if preco_original > preco_atual else 0
 
-                # Estoque e Categoria pelas classes do card na NewPOP
                 classes_card = card.get_attribute("class") or ""
                 indisponivel_tag = card.locator(".bandeira-indisponivel, .indisponivel").count() > 0
 
@@ -381,7 +397,7 @@ def extrair_newpop (pagina, url_produto):
         print(f"   [Erro] Falha ao ler produto NewPOP {url_produto}: {erro}")
         return None
     
-def extrair_vitrine_pipoca(pagina, url_inicial, max_paginas=100):
+def extrair_vitrine_pipoca(pagina, url_inicial, max_paginas=100, urls_vistas=None):
     """
     Crawler para Pipoca & Nanquim (Magento 2).
     Funciona tanto na Home (carrosséis) quanto nas páginas de categorias (.html).
@@ -389,7 +405,8 @@ def extrair_vitrine_pipoca(pagina, url_inicial, max_paginas=100):
     url_atual = url_inicial
     pagina_num = 1
     produtos_extraidos = []
-    urls_vistas = set()
+    if urls_vistas is None:
+        urls_vistas = set()
     
     while url_atual and pagina_num <= max_paginas:
         print(f"\n[Pipoca & Nanquim] Varrendo Página {pagina_num}: {url_atual}...")
@@ -444,12 +461,11 @@ def extrair_vitrine_pipoca(pagina, url_inicial, max_paginas=100):
 
                 tem_botao = card.locator("button.tocart").count() > 0
                 fora_estoque = card.locator(".stock.unavailable").count() > 0
-                texto_card = card.inner_text()
 
                 if fora_estoque or not tem_botao:
                     status_estoque = "Indisponível"
                     disponivel = False
-                elif "Pré-venda" in texto_card or "Pré-Venda" in texto_card:
+                elif "Pré-venda" in card.inner_text() or "Pré-Venda" in card.inner_text():
                     status_estoque = "Pré-venda"
                     disponivel = True
                 else:
