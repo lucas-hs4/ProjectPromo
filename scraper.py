@@ -1,3 +1,4 @@
+import json
 from playwright.sync_api import sync_playwright
 
 cancelar_varredura = False
@@ -6,7 +7,7 @@ TERMOS_IGNORADOS = [
     "figurinha", "álbum", "album","cromo", "envelope",
     "adrenalyn", "fifa", "libertadores", "brasileirão",
     "brasileirao", "copa do mundo", "seleção da copa", "starter pack",
-    "chaveiro", "pn toys"
+    "chaveiro", "pn toys", "assinatura", "figure"
 ]
 
 def extrair_panini(pagina, url_produto):
@@ -56,7 +57,12 @@ def extrair_panini(pagina, url_produto):
             status_estoque = "Em estoque"
             disponivel = True
             
-        loja_nome = "Pipoca & Nanquim" if "pipocaenanquim.com.br" in url_produto else "Panini"
+        if "pipocaenanquim.com.br" in url_produto:
+            loja_nome = "Pipoca & Nanquim"
+        elif "mpeg.com.br" in url_produto:
+            loja_nome = "MPEG"
+        else:
+            loja_nome = "Panini"
             
         return {
             "loja": loja_nome,
@@ -73,6 +79,25 @@ def extrair_panini(pagina, url_produto):
     except Exception as erro:
         print(f"   [Erro] Falha ao ler produto {url_produto}: {erro}")
         return None
+    
+def ler_cards_magento(cards):
+    """Lê todos os cards da página de uma só vez no navegador (Panini e Pipoca & Nanquim)."""
+    return cards.evaluate_all("""els => els.map(el => {
+        const link = el.querySelector('a.product-item-link');
+        const img = el.querySelector('img.product-image-photo');
+        const pFinal = el.querySelector('[data-price-type="finalPrice"]');
+        const pOld = el.querySelector('[data-price-type="oldPrice"]');
+        const texto = el.innerText || '';
+        return {
+            nome: link ? link.innerText.trim() : '',
+            url: link ? link.href : '',
+            img: img ? img.src : '',
+            preco_atual: pFinal ? parseFloat(pFinal.getAttribute('data-price-amount') || 0) : 0,
+            preco_antigo: pOld ? parseFloat(pOld.getAttribute('data-price-amount') || 0) : 0,
+            disponivel: !!el.querySelector('button.tocart') && !el.querySelector('.stock.unavailable'),
+            prevenda: !!el.querySelector('.infobase-label-presale') || texto.includes('Pré-venda') || texto.includes('Pré-Venda')
+        };
+    })""")
 
 def extrair_vitrine_panini(pagina, url_inicial, max_paginas=100, urls_vistas=None):
     """
@@ -103,69 +128,37 @@ def extrair_vitrine_panini(pagina, url_inicial, max_paginas=100, urls_vistas=Non
             break
     
         cards = pagina.locator("div.products-grid div.product-item-info")
-        total_cards = cards.count()
-        print(f"Encontrados {total_cards} produtos nesta página.")
+        lista_bruta = ler_cards_magento(cards)
+        print(f"Encontrados {len (lista_bruta)} produtos nesta página.")
     
-        for i in range(total_cards):
-            try:
-                card = cards.nth(i)
-            
-                link_elemento = card.locator("a.product-item-link").first
-                if link_elemento.count() == 0:
-                    continue
-        
-                nome = link_elemento.inner_text().strip()
-                url_produto = link_elemento.get_attribute("href")
-                
-                if url_produto in urls_vistas:
-                    continue
-                urls_vistas.add(url_produto)
-                
-                img_elemento = card.locator("img.product-image-photo").first
-                imagem_url = img_elemento.get_attribute("src") if img_elemento.count() > 0 else ""
-
-                loc_preco_final = card.locator('[data-price-type="finalPrice"]').first
-                if loc_preco_final.count() > 0:
-                    preco_atual = float(loc_preco_final.get_attribute("data-price-amount"))
-                else:
-                    preco_atual = 0.0
-
-                loc_preco_antigo = card.locator('[data-price-type="oldPrice"]').first
-                if loc_preco_antigo.count() > 0:
-                    preco_original = float(loc_preco_antigo.get_attribute("data-price-amount"))
-                else:
-                    preco_original = preco_atual
-                    
-                desconto_pct = round(((preco_original - preco_atual) / preco_original) * 100) if preco_original > preco_atual else 0
-
-                tem_botao_compra = card.locator("button.tocart").count() > 0
-                fora_de_estoque = card.locator(".stock.unavailable").count() > 0
-                
-                if fora_de_estoque or not tem_botao_compra:
-                    status_estoque = "Indisponível"
-                    disponivel = False
-                elif card.locator(".infobase-label-presale").count() > 0 or "Pré-venda" in card.inner_text():
-                    status_estoque = "Pré-venda"
-                    disponivel = True
-                else: 
-                    status_estoque = "Em estoque"
-                    disponivel = True
-                    
-                produtos_extraidos.append({
-                    "loja": "Panini",
-                    "categoria": identificar_categoria(nome, url_atual, preco_atual),
-                    "nome": nome,
-                    "url": url_produto,
-                    "imagem_url": imagem_url,
-                    "preco_original": preco_original,
-                    "preco_atual": preco_atual,
-                    "desconto_pct": desconto_pct,
-                    "status": status_estoque,
-                    "disponivel": disponivel
-                })
-            except Exception as erro_card:
-                print(f"   [Aviso] Pulando card #{i+1} por erro de leitura {erro_card}")
+        for item in lista_bruta:
+            if not item["url"] or item["url"] in urls_vistas:
                 continue
+            urls_vistas.add(item["url"])
+            
+            preco_atual = item["preco_atual"]
+            preco_original = item["preco_antigo"] if item["preco_antigo"] > 0 else preco_atual
+            desconto_pct = round(((preco_original - preco_atual) / preco_original) * 100) if preco_original > preco_atual else 0
+            
+            if not item["disponivel"]:
+                status_estoque = "Indisponível"
+            elif item["prevenda"]:
+                status_estoque = "Pré-venda"
+            else:
+                status_estoque = "Em estoque"
+
+            produtos_extraidos.append({
+                "loja": "Panini",
+                "categoria": identificar_categoria(item["nome"], url_atual, preco_atual),
+                "nome": item["nome"],
+                "url": item["url"],
+                "imagem_url": item["img"],
+                "preco_original": preco_original,
+                "preco_atual": preco_atual,
+                "desconto_pct": desconto_pct,
+                "status": status_estoque,
+                "disponivel": item["disponivel"]
+            })
             
         botao_proxima = pagina.locator("li.pages-item-next a.action.next").first
         if botao_proxima.count() > 0 and pagina_num < max_paginas:
@@ -197,13 +190,13 @@ def identificar_categoria(nome, url_contexto="", preco_atual=10.0):
         return "Star Wars"
     elif "/the-walking-dead" in texto or "walking dead" in texto:
         return "The Walking Dead"
-    elif "/panini-books" in texto or "novel" in texto or "livro" in texto or "livros.html" in texto or "livrosnovels" in texto:
+    elif "/panini-books" in texto or "/novels" in texto or "novel" in texto or "livro" in texto or "livros.html" in texto or "livrosnovels" in texto:
         return "Novels & Livros"
     elif "/marvel" in texto or any(h in texto for h in ["homem-aranha","homem de ferro", "viúva negra", "viuva negra", "viúva-negra", "aranha", "vingadores", "x-men", "wolverine", "demolidor", "thor", "capitão américa", "capitao américa", "hulk", "deadpool", "quarteto fantástico", "surfista prateado"]):
         return "Marvel"
     elif "/dc-comics" in texto or "dc+comics" in texto or any(h in texto for h in ["batman", "superman", "mulher-maravilha", "liga da justiça", "flash", "lanterna verde", "asa noturna", "coringa", "sandman", "arlequina", "watchmen", "juízo final", "heróis em crise", "herois em crise", "robin", "shazam"]):
         return "DC Comics"
-    elif "/planet-manga" in texto or "planet+manga" in texto or "lojanewpop" in texto or "mangas.html" in texto or any(m in texto for m in ["junji ito", "shigurui", "city hunter", "cat's eye", "cats eye", "chushingura", "battle royale", "one piece", "berserk", "naruto", "dragon ball", "demon slayer", "jujutsu", "tokyo ghoul", "chainsaw man"]):
+    elif "/planet-manga" in texto or "planet+manga" in texto or "lojanewpop" in texto or "mpeg.com.br" in texto or "mangas.html" in texto or any(m in texto for m in ["junji ito", "shigurui", "city hunter", "cat's eye", "cats eye", "chushingura", "battle royale", "one piece", "berserk", "naruto", "dragon ball", "demon slayer", "jujutsu", "tokyo ghoul", "chainsaw man"]):
         return "Mangás"
     elif "/mauricio-de-sousa-catalogo" in texto or "mauricio" in texto or "mônica" in texto or "monica" in texto or "cebolinha" in texto or "cascão" in texto or "magali" in texto or "chico bento" in texto or "xaveco" in texto or "tina" in texto or "saiba mais" in texto:
         return "Turma da Mônica"
@@ -243,77 +236,59 @@ def extrair_vitrine_newpop(pagina, url_inicial, max_paginas=2,urls_vistas=None):
             break
 
         cards = pagina.locator("#listagemProdutos div.listagem-item")
-        total_cards = cards.count()
-        print(f"Encontrados {total_cards} produtos nesta página.")
+        lista_bruta = cards.evaluate_all("""els => els.map(el => {
+            const link = el.querySelector('a.nome-produto');
+            const img = el.querySelector('img.imagem-principal');
+            const pPromo = el.querySelector('strong.preco-promocional');
+            const pNormal = el.querySelector('strong.preco-venda');
+            const pAntigo = el.querySelector('s.preco-venda');
+            const classes = el.className || '';
+            return {
+                nome: link ? link.innerText.trim() : '',
+                url: link ? link.href : '',
+                img: img ? img.src : '',
+                preco_attr: pPromo ? pPromo.getAttribute('data-sell-price') : (pNormal ? pNormal.getAttribute('data-sell-price') : ''),
+                preco_txt: pPromo ? pPromo.innerText : (pNormal ? pNormal.innerText : ''),
+                antigo_txt: pAntigo ? pAntigo.innerText : '',
+                classes: classes,
+                esgotado: !! el.querySelector('.bandeira-indisponivel, .indisponivel') || classes.includes('indisponivel')
+            };
+        })""")
+        print(f"Encontrados {len(lista_bruta)} produtos nesta página.")
 
-        for i in range(total_cards):
-            try:
-                card = cards.nth(i)
-
-                link_el = card.locator("a.nome-produto").first
-                if link_el.count() == 0:
-                    continue
-
-                nome = link_el.inner_text().strip()
-                url_produto = link_el.get_attribute("href")
-                
-                if url_produto in urls_vistas:
-                    continue
-                urls_vistas.add(url_produto)
-
-                img_el = card.locator("img.imagem-principal").first
-                imagem_url = img_el.get_attribute("src") if img_el.count() > 0 else ""
-
-                loc_promo = card.locator("strong.preco-promocional").first
-                loc_normal = card.locator("strong.preco-venda").first
-
-                if loc_promo.count() > 0:
-                    attr_preco = loc_promo.get_attribute("data-sell-price")
-                    preco_atual = float(attr_preco) if attr_preco else limpar_preco_br(loc_promo.inner_text())
-                elif loc_normal.count() > 0:
-                    attr_preco = loc_normal.get_attribute("data-sell-price")
-                    preco_atual = float(attr_preco) if attr_preco else limpar_preco_br(loc_normal.inner_text())
-                else:
-                    preco_atual = 0.0
-                    
-                loc_antigo = card.locator("s.preco-venda").first
-                if loc_antigo.count() > 0:
-                    preco_original = limpar_preco_br(loc_antigo.inner_text())
-                else:
-                    preco_original = preco_atual
-
-                desconto_pct = round(((preco_original - preco_atual) / preco_original) * 100) if preco_original > preco_atual else 0
-
-                classes_card = card.get_attribute("class") or ""
-                indisponivel_tag = card.locator(".bandeira-indisponivel, .indisponivel").count() > 0
-
-                if indisponivel_tag or "indisponivel" in classes_card or preco_atual == 0.0:
-                    status_estoque = "Indisponível"
-                    disponivel = False
-                elif "prod-cat-589867" in classes_card:
-                    status_estoque = "Pré-venda"
-                    disponivel = True
-                else:
-                    status_estoque = "Em estoque"
-                    disponivel = True
-
-                categoria = "Novels & Livros" if "prod-cat-500119" in classes_card else "Mangás"
-
-                produtos_extraidos.append({
-                    "loja": "NewPOP",
-                    "categoria": categoria,
-                    "nome": nome,
-                    "url": url_produto,
-                    "imagem_url": imagem_url,
-                    "preco_original": preco_original,
-                    "preco_atual": preco_atual,
-                    "desconto_pct": desconto_pct,
-                    "status": status_estoque,
-                    "disponivel": disponivel
-                })
-            except Exception as erro_card:
-                print(f"   [Aviso] Pulando card #{i+1} na NewPOP: {erro_card}")
+        for item in lista_bruta:
+            if not item["url"] or item["url"] in urls_vistas:
                 continue
+            urls_vistas.add(item["url"])
+            
+            preco_atual = float(item["preco_attr"]) if item["preco_attr"] else limpar_preco_br(item["preco_txt"])
+            preco_original = limpar_preco_br(item["antigo_txt"]) if item["antigo_txt"] else preco_atual
+            desconto_pct = round(((preco_original - preco_atual) / preco_original) * 100) if preco_original > preco_atual else 0
+
+            if item["esgotado"] or preco_atual == 0.0:
+                status_estoque = "Indisponível"
+                disponivel = False
+            elif "prod-cat-589867" in item["classes"]:
+                status_estoque = "Pré-venda"
+                disponivel = True
+            else:
+                status_estoque = "Em estoque"
+                disponivel = True
+
+            categoria = "Novels & Livros" if "prod-cat-500119" in item["classes"] else "Mangás"
+
+            produtos_extraidos.append({
+                "loja": "NewPOP",
+                "categoria": categoria,
+                "nome": item["nome"],
+                "url": item["url"],
+                "imagem_url": item["img"],
+                "preco_original": preco_original,
+                "preco_atual": preco_atual,
+                "desconto_pct": desconto_pct,
+                "status": status_estoque,
+                "disponivel": disponivel
+            })
 
         botao_prox = pagina.locator(".pagination li:not(.disabled) a[rel='next'], .pagination li a:has-text('›')").first
         if botao_prox.count() > 0 and pagina_num < max_paginas:
@@ -407,9 +382,14 @@ def extrair_vitrine_pipoca(pagina, url_inicial, max_paginas=100, urls_vistas=Non
     produtos_extraidos = []
     if urls_vistas is None:
         urls_vistas = set()
+        
+    loja_nome = "MPEG" if "mpeg.com.br" in url_inicial else "Pipoca & Nanquim"
     
     while url_atual and pagina_num <= max_paginas:
-        print(f"\n[Pipoca & Nanquim] Varrendo Página {pagina_num}: {url_atual}...")
+        if cancelar_varredura:
+            print("   [Parada] Varredura interrompida pelo usuário.")
+            break
+        print(f"\n[{loja_nome}] Varrendo Página {pagina_num}: {url_atual}...")
         
         try:
             resposta = pagina.goto(url_atual, wait_until="commit", timeout=60000)
@@ -422,71 +402,37 @@ def extrair_vitrine_pipoca(pagina, url_inicial, max_paginas=100, urls_vistas=Non
             break
         
         cards = pagina.locator("div.products-grid div.product-item-info, ol.widget-product-carousel div.product-item-info")
-        total_cards = cards.count()
-        print(f"Encontrados {total_cards} cards nessa página.")
+        lista_bruta = ler_cards_magento(cards)
+        print(f"Encontrados {len(lista_bruta)} cards nessa página.")
         
-        for i in range(total_cards):
-            try:
-                card = cards.nth(i)
-                
-                link_el = card.locator("a.product-item-link").first
-                if link_el.count() == 0:
-                    continue
-                
-                nome = link_el.inner_text().strip()
-                url_produto = link_el.get_attribute("href")
-                
-                if url_produto in urls_vistas:
-                    continue
-                urls_vistas.add(url_produto)
-                
-                texto_analise = f"{nome} {url_produto}".lower()
-                
-                loc_preco_final = card.locator('[data-price-type="finalPrice"]').first
-                if loc_preco_final.count() > 0:
-                    preco_atual = float(loc_preco_final.get_attribute("data-price-amount"))
-                else:
-                    preco_atual = 0.0
-
-                loc_preco_antigo = card.locator('[data-price-type="oldPrice"]').first
-                if loc_preco_antigo.count() > 0:
-                    preco_original = float(loc_preco_antigo.get_attribute("data-price-amount"))
-                else:
-                    preco_original = preco_atual
-
-                desconto_pct = round(((preco_original - preco_atual) / preco_original) * 100) if preco_original > preco_atual else 0
-
-                img_el = card.locator("img.product-image-photo").first
-                imagem_url = img_el.get_attribute("src") if img_el.count() > 0 else ""
-
-                tem_botao = card.locator("button.tocart").count() > 0
-                fora_estoque = card.locator(".stock.unavailable").count() > 0
-
-                if fora_estoque or not tem_botao:
-                    status_estoque = "Indisponível"
-                    disponivel = False
-                elif "Pré-venda" in card.inner_text() or "Pré-Venda" in card.inner_text():
-                    status_estoque = "Pré-venda"
-                    disponivel = True
-                else:
-                    status_estoque = "Em estoque"
-                    disponivel = True
-
-                produtos_extraidos.append({
-                    "loja": "Pipoca & Nanquim",
-                    "categoria": identificar_categoria(nome, url_atual, preco_atual),
-                    "nome": nome,
-                    "url": url_produto,
-                    "imagem_url": imagem_url,
-                    "preco_original": preco_original,
-                    "preco_atual": preco_atual,
-                    "desconto_pct": desconto_pct,
-                    "status": status_estoque,
-                    "disponivel": disponivel
-                })
-            except Exception as erro_card:
-                print(f"   [Aviso] Pulando card #{i+1} na P&N: {erro_card}")
+        for item in lista_bruta:
+            if not item["url"] or item["url"] in urls_vistas:
                 continue
+            urls_vistas.add(item["url"])
+
+            preco_atual = item["preco_atual"]
+            preco_original = item["preco_antigo"] if item["preco_antigo"] > 0 else preco_atual
+            desconto_pct = round(((preco_original - preco_atual) / preco_original) * 100) if preco_original > preco_atual else 0
+
+            if not item["disponivel"]:
+                status_estoque = "Indisponível"
+            elif item["prevenda"]:
+                status_estoque = "Pré-venda"
+            else:
+                status_estoque = "Em estoque"
+
+            produtos_extraidos.append({
+                "loja": loja_nome,
+                "categoria": identificar_categoria(item["nome"], url_atual, preco_atual),
+                "nome": item["nome"],
+                "url": item["url"],
+                "imagem_url": item["img"],
+                "preco_original": preco_original,
+                "preco_atual": preco_atual,
+                "desconto_pct": desconto_pct,
+                "status": status_estoque,
+                "disponivel": item["disponivel"]
+            })
 
         botao_proxima = pagina.locator("li.pages-item-next a.action.next").first
         if botao_proxima.count() > 0 and pagina_num < max_paginas:
@@ -495,4 +441,143 @@ def extrair_vitrine_pipoca(pagina, url_inicial, max_paginas=100, urls_vistas=Non
         else:
             url_atual = None
 
+    return produtos_extraidos
+
+def converter_no_jbc(no):
+    """Converse o bloco JSON de um produto da JBC/Companhia das Letras para o formato do banco."""
+    nome = no.get("name", "").strip()
+    slug = no.get("slug") or no.get("seo", {}).get("canonical", "").strip("/")
+    if not nome or not slug:
+        return None
+    
+    url_produto = f"https://www.companhiadasletras.com.br/{slug}/p" if not slug.endswith("/p") else f"https://www.companhiadasletras.com.br/{slug}"
+    
+    imagens = no.get("image", [])
+    imagem_url = imagens[0].get("url", "") if imagens else ""
+    
+    ofertas = no.get("offers", {}).get("offers", [])
+    if ofertas:
+        preco_atual = float(ofertas[0].get("price", 0.0))
+        preco_original = float(ofertas[0].get("listPrice", preco_atual))
+        em_estoque_vtex = "InStock" in ofertas[0].get("availability", "")
+    else:
+        preco_atual = 0.0
+        preco_original = 0.0
+        em_estoque_vtex = False
+        
+    desconto_pct = round(((preco_original - preco_atual) / preco_original) * 100) if preco_original > preco_atual else 0
+    
+    specs = {s.get("name"): s.get("value", "") for s in no.get("specifications", [])}
+    status_disp = specs.get("Status de disponibilidade", "").lower()
+    
+    if not em_estoque_vtex or preco_atual == 0.0:
+        status_estoque = "Indisponível"
+        disponivel = False
+    elif "pré-venda" in status_disp or "pre-venda" in status_disp:
+        status_estoque = "Pré-venda"
+        disponivel = True
+    else:
+        status_estoque = "Em estoque"
+        disponivel = True
+        
+    categoria = "Novels & Livros" if ("novel" in nome.lower() or "livro" in nome.lower()) else "Mangás"
+    
+    return {
+        "loja": "JBC",
+        "categoria": categoria,
+        "nome": nome,
+        "url": url_produto,
+        "imagem_url": imagem_url,
+        "preco_original": preco_original,
+        "preco_atual": preco_atual,
+        "desconto_pct": desconto_pct,
+        "status": status_estoque,
+        "disponivel": disponivel
+    }
+    
+def extrair_jbc(pagina, url_produto):
+    """Extrai dados de um mangá individual da JBC (usado na Wishlist)."""
+    print(f"Consultando JBC: {url_produto}...")
+    try:
+        resposta = pagina.goto(url_produto, wait_until="domcontentloaded", timeout=60000)
+        if resposta.status != 200:
+            return None
+        texto_json = pagina.locator("script#__NEXT_DATA__").inner_text()
+        dados_next = json.loads(texto_json)
+        no_produto = dados_next.get("props", {}).get("pageProps", {}).get("data", {}).get("product", {})
+        return converter_no_jbc(no_produto)
+    except Exception as erro:
+        print(f"   [Erro] Falhar ao ler produto JBC {url_produto}: {erro}")
+        return None
+    
+def extrair_vitrine_jbc(pagina, url_inicial, max_cliques=90, urls_vistas=None):
+    """
+    Crawler para a vitrine da JBC na Companhia das Letras.
+    Clica em 'Ver mais' e para sozinho assim que os títulos começarem a repetir.
+    """
+    produtos_extraidos = []
+    if urls_vistas is None:
+        urls_vistas = set()
+        
+    nos_fila = []
+
+    def capturar_graphql(resposta):
+        if "graphql" in resposta.url and resposta.status == 200:
+            try:
+                d = resposta.json()
+                edges = d.get("data", {}).get("search", {}).get("products", {}).get("edges", [])
+                for e in edges:
+                    if "node" in e:
+                        nos_fila.append(e["node"])
+            except Exception:
+                pass
+            
+    pagina.on("response", capturar_graphql)
+    
+    try:
+        print(f"\n[JBC] Abrindo vitrine: {url_inicial}...")
+        pagina.goto(url_inicial, wait_until="domcontentloaded", timeout=60000)
+        
+        loc_next = pagina.locator("script#__NEXT_DATA__")
+        if loc_next.count() > 0:
+            dados_iniciais = json.loads(loc_next.inner_text())
+            edges_ini = dados_iniciais.get("props", {}).get("pageProps", {}).get("data", {}).get("search", {}).get("products", {}).get("edges", [])
+            for e in edges_ini:
+                if "node" in e:
+                    nos_fila.append(e["node"])
+                    
+        clique_num = 0
+        while clique_num <= max_cliques:
+            if cancelar_varredura:
+                print("   [Parada] Varredura interrompida pelo usuário.")
+                break
+            
+            novos_neste_lote = 0
+            while nos_fila:
+                no = nos_fila.pop(0)
+                prod = converter_no_jbc(no)
+                if prod and prod["url"] not in urls_vistas:
+                    urls_vistas.add(prod["url"])
+                    produtos_extraidos.append(prod)
+                    novos_neste_lote += 1
+                    
+            print(f"[JBC] Lote {clique_num + 1}: +{novos_neste_lote}  mangás inéditos (Total JBC: {len(produtos_extraidos)}).")
+            
+            if clique_num > 0 and novos_neste_lote == 0:
+                print("[JBC] Fim do catálogo atingido (títulos repetidos detectados). Encerrando JBC!")
+                break
+            
+            botao_mais = pagina.locator("button:has-text('Ver mais'), a:has-text('Ver mais')").first
+            if botao_mais.count() == 0 or clique_num >= max_cliques:
+                break
+            
+            clique_num += 1
+            botao_mais.evaluate("el => el.click()")
+            pagina.wait_for_timeout(1800)
+            
+    except Exception as erro:
+        print(f"   [Erro de Rede] Falha na vitrine JBC: {erro}")
+    finally:
+        pagina.remove_listener("response", capturar_graphql)    
+    
     return produtos_extraidos

@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-from scraper import extrair_panini, extrair_vitrine_panini, extrair_newpop, extrair_vitrine_newpop, extrair_vitrine_pipoca
+from scraper import extrair_panini, extrair_vitrine_panini, extrair_newpop, extrair_vitrine_newpop, extrair_vitrine_pipoca, extrair_jbc, extrair_vitrine_jbc
 from database import inicializar_banco, salvar_leitura, atualizar_status_alerta, conectar, listar_urls_favoritos
 from notificador import enviar_alerta_ntfy
 import ctypes
@@ -8,12 +8,12 @@ DESCONTO_MINIMO_WISHLIST = 20
 DESCONTO_MINIMO_PCT = 70
 
 VITRINES_MONITORADAS = [
-    "https://panini.com.br/marvel?product_list_limit=36", #Marvel
-    "https://panini.com.br/planet-manga?product_list_limit=36", #Mangás
-    "https://panini.com.br/dc-comics?product_list_limit=36", #DC
-    "https://panini.com.br/panini-books?product_list_limit=36", #Livros/Novels
-    "https://panini.com.br/panini-comics?product_list_limit=36", #Outras HQs
-    "https://panini.com.br/mauricio-de-sousa-catalogo?product_list_limit=36", #Turma da Mônica
+    #"https://panini.com.br/marvel?product_list_limit=36", #Marvel
+    #"https://panini.com.br/planet-manga?product_list_limit=36", #Mangás
+    #"https://panini.com.br/dc-comics?product_list_limit=36", #DC
+    #"https://panini.com.br/panini-books?product_list_limit=36", #Livros/Novels
+    #"https://panini.com.br/panini-comics?product_list_limit=36", #Outras HQs
+    #"https://panini.com.br/mauricio-de-sousa-catalogo?product_list_limit=36", #Turma da Mônica
     #"https://panini.com.br/novidades/pre-vendas?product_list_limit=36", #Pré-venda
     #"https://panini.com.br/novidades/reimpressao?product_list_limit=36", #Reimpressão
     #"https://panini.com.br/desconto-saldao?product_list_limit=36", #Saldão
@@ -24,13 +24,13 @@ VITRINES_MONITORADAS = [
 ]
 
 VITRINES_NEWPOP = [
-    "https://www.lojanewpop.com.br/",
-    "https://www.lojanewpop.com.br/mangas",
-    "https://www.lojanewpop.com.br/one-shots",
-    "https://www.lojanewpop.com.br/livrosnovels-",
-    "https://www.lojanewpop.com.br/nacionais",
-    "https://www.lojanewpop.com.br/pre-venda",
-    "https://www.lojanewpop.com.br/pacotes",
+    #"https://www.lojanewpop.com.br/",
+    #"https://www.lojanewpop.com.br/mangas",
+    #"https://www.lojanewpop.com.br/one-shots",
+    #"https://www.lojanewpop.com.br/livrosnovels-",
+    #"https://www.lojanewpop.com.br/nacionais",
+    #"https://www.lojanewpop.com.br/pre-venda",
+    #"https://www.lojanewpop.com.br/pacotes",
     #"https://www.lojanewpop.com.br/marca/aca.html",
     #"https://www.lojanewpop.com.br/marca/aventura.html",
     #"https://www.lojanewpop.com.br/marca/classicos.html",
@@ -42,12 +42,22 @@ VITRINES_NEWPOP = [
 ]
 
 VITRINES_PIPOCA = [
-    "https://pipocaenanquim.com.br/mangas.html",
-    "https://pipocaenanquim.com.br/quadrinhos.html",
-    "https://pipocaenanquim.com.br/livros.html,",
-    "https://pipocaenanquim.com.br/colec-o.html",
+    #"https://pipocaenanquim.com.br/mangas.html",
+    #"https://pipocaenanquim.com.br/quadrinhos.html",
+    #"https://pipocaenanquim.com.br/livros.html",
+    #"https://pipocaenanquim.com.br/colec-o.html",
     #"https://pipocaenanquim.com.br/promoc-o.html",
     #"https://pipocaenanquim.com.br/pre-vendas.html",
+]
+
+VITRINES_MPEG = [
+    "https://mpeg.com.br/mangas?product_list_limit=36",
+    "https://mpeg.com.br/novels?product_list_limit=36",
+    "https://mpeg.com.br/prevendas?product_list_limit=36",
+]
+
+VITRINES_JBC = [
+    "https://www.companhiadasletras.com.br/JBC?brand=jbc&fuzzy=0&operator=and&facets=brand%2Cfuzzy%2Coperator&sort=score_desc&page=0",
 ]
 
 URLS_INDIVIDUAIS = [
@@ -116,6 +126,8 @@ def executar_robo(modo="completo"):
             urls_ja_varridas.add(url)
             if "lojanewpop.com.br" in url:
                 dados = extrair_newpop(pagina, url)
+            elif "companhiadasletras.com.br" in url:
+                dados = extrair_jbc(pagina, url)
             else:
                 dados = extrair_panini(pagina, url)
             if dados:
@@ -143,15 +155,18 @@ def executar_robo(modo="completo"):
                 lista_pipoca = extrair_vitrine_pipoca(pagina, url_pipoca, max_paginas=50, urls_vistas=urls_ja_varridas)
                 for dados in lista_pipoca:
                     processar_produto(dados,conexao_db)
-
-        #for url in URLS_INDIVIDUAIS:
-            #if "lojanewpop.com.br" in url:
-                #dados = extrair_newpop(pagina, url)
-            #else:
-                #dados = extrair_panini(pagina, url)
-
-            #if dados:
-                #processar_produto(dados)
+                    
+            for url_mpeg in VITRINES_MPEG:
+                if scraper.cancelar_varredura: break
+                lista_mpeg = extrair_vitrine_pipoca(pagina, url_mpeg, max_paginas=50, urls_vistas=urls_ja_varridas)
+                for dados in lista_mpeg:
+                    processar_produto(dados, conexao_db)
+                    
+            for url_jbc in VITRINES_JBC:
+                if scraper.cancelar_varredura: break
+                lista_jbc = extrair_vitrine_jbc(pagina, url_jbc, max_cliques=90, urls_vistas=urls_ja_varridas)
+                for dados in lista_jbc:
+                    processar_produto(dados, conexao_db)
         
         navegador.close()
         conexao_db.close()

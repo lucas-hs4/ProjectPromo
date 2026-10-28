@@ -75,11 +75,13 @@
             </select>
         </label>
         
-        <label>Loja:
+        <label>Editora:
             <select name="loja">
                 <option value="">Todas</option>
                 <option value="Panini" {% if loja == 'Panini' %}selected{% endif %}>Panini</option>
                 <option value="NewPOP" {% if loja == 'NewPOP' %}selected{% endif %}>NewPOP</option>
+                <option value="JBC" {% if loja == 'JBC' %}selected{% endif %}>JBC</option>
+                <option value="MPEG" {% if loja == 'MPEG' %}selected{% endif %}>MPEG</option>
                 <option value="Pipoca & Nanquim" {% if loja == 'Pipoca & Nanquim' %}selected{% endif %}>Pipoca & Nanquim</option>
             </select>
         </label>

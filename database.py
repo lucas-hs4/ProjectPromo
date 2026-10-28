@@ -71,14 +71,6 @@ def inicializar_banco():
         WHERE categoria IN ('Panini Comics / Outros', 'Geral');
     """)
     
-    #cursor.execute("""
-        #SELECT p.id, p.nome, p.url, COALESCE(
-            #(SELECT h.preco_atual FROM historico_precos h WHERE h.produto_id = p.id ORDER BY h.data_consulta DESC LIMIT 1),
-            #10.0
-        #)
-        #FROM produtos p;
-    #""")
-    
     cursor.execute("""
         ALTER TABLE produtos
         ADD COLUMN IF NOT EXISTS favorito BOOLEAN DEFAULT FALSE;
@@ -89,17 +81,12 @@ def inicializar_banco():
         ADD COLUMN IF NOT EXISTS ultimo_alerta TIMESTAMP;
     """)
     
+    cursor.execute("""
+        ALTER TABLE produtos
+        ADD COLUMN IF NOT EXISTS plataforma VARCHAR(50) DEFAULT 'Editoras';
+    """)
+    
     cursor.execute("UPDATE produtos SET categoria = 'Mangás' WHERE loja = 'NewPOP' AND categoria = 'Excluídos';")
-    
-    #for prod_id, nome, url, preco in cursor.fetchall():
-        #nova_cat = identificar_categoria(nome, url, float(preco))
-        #cursor.execute("UPDATE produtos SET categoria = %s WHERE id = %s;", (nova_cat, prod_id))
-    
-    #cursor.execute("UPDATE produtos SET categoria = 'Mangás' WHERE categoria = 'Excluídos' AND nome ILIKE '%Junji Ito%';")
-    #cursor.execute("UPDATE produtos SET categoria = 'Conan' WHERE categoria = 'Excluídos' AND nome ILIKE '%Conan%';")
-    #cursor.execute("UPDATE produtos SET categoria = 'Turma da Mônica' WHERE categoria = 'Excluídos' AND nome ILIKE ANY (ARRAY['%Mônica%', '%Monica%', '%Chico Bento%', '%Cebolinha%', '%Cascão%', '%Magali%', '%Xaveco%']);")
-    #cursor.execute("UPDATE produtos SET categoria = 'Marvel' WHERE categoria = 'Excluídos' AND nome ILIKE ANY (ARRAY['%Marvel%', '%Homem de Ferro%', '%Capitão América%', '%Homem-Aranha%', '%Viúva Negra%']);")
-    #cursor.execute("UPDATE produtos SET categoria = 'DC Comics' WHERE categoria = 'Excluídos' AND nome ILIKE ANY (ARRAY['%Juízo Final%', '%Crise%', '%Batman %','%Superman%']);")
     
     conexao.commit()
     cursor.close()
@@ -117,15 +104,17 @@ def salvar_leitura(dados, conexao=None):
     cursor = conexao.cursor()
     
     loja = dados.get("loja", "Panini")
+    plataforma = dados.get("plataforma", "Editoras")
     imagem_url = dados.get("imagem_url", "")
     categoria = dados.get("categoria", "Outros")
     
     sql_produto = """
-        INSERT INTO produtos (nome, url, loja, imagem_url, categoria)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO produtos (nome, url, loja, plataforma, imagem_url, categoria)
+        VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (url) DO UPDATE
         SET nome = EXCLUDED.nome,
             loja = EXCLUDED.loja,
+            plataforma = EXCLUDED.plataforma,
             imagem_url = CASE
                 WHEN EXCLUDED.imagem_url != '' THEN EXCLUDED.imagem_url
                 ELSE produtos.imagem_url
@@ -138,7 +127,7 @@ def salvar_leitura(dados, conexao=None):
             END
         RETURNING id, (alerta_enviado AND ultimo_alerta IS NOT NULL AND ultimo_alerta > NOW() - INTERVAL '3 days'), favorito;
     """
-    cursor.execute(sql_produto, (dados["nome"], dados["url"], loja, imagem_url, categoria))
+    cursor.execute(sql_produto, (dados["nome"], dados["url"], loja, plataforma, imagem_url, categoria))
     
     resultado_produto = cursor.fetchone()
     produto_id = resultado_produto[0]
@@ -204,7 +193,7 @@ def atualizar_status_alerta(produto_id, status_booleano):
     cursor.close()
     conexao.close()
     
-def listar_ofertas(desconto_min=0, preco_min=0.0, preco_max=0.0, busca="", loja="", categoria="", apenas_disponiveis=False, apenas_favoritos=False, ordem="desconto", pagina=1, por_pagina=48):
+def listar_ofertas(desconto_min=0, preco_min=0.0, preco_max=0.0, busca="", loja="", categoria="", apenas_disponiveis=False, apenas_favoritos=False, ordem="desconto", pagina=1, por_pagina=48, plataforma="Editoras"):
     """
     Busca todos os produtos com sua leitura mais recente,
     aplicando filtros de desconto, nome e estoque.
@@ -215,7 +204,7 @@ def listar_ofertas(desconto_min=0, preco_min=0.0, preco_max=0.0, busca="", loja=
     sql = """
         SELECT COUNT(*) OVER() AS total_geral, * FROM (
             SELECT DISTINCT ON (p.id)
-                p.id, p.nome, p.url, p.loja, p.imagem_url, p.categoria, p.favorito,
+                p.id, p.nome, p.url, p.loja, p.plataforma, p.imagem_url, p.categoria, p.favorito,
                 h.preco_original, h.preco_atual, h.desconto_pct,
                 h.status_estoque, h.disponivel, h.data_consulta,
                 MIN(h.preco_atual) OVER (PARTITION BY p.id) AS menor_preco
@@ -239,6 +228,12 @@ def listar_ofertas(desconto_min=0, preco_min=0.0, preco_max=0.0, busca="", loja=
     if loja:
         sql += " AND loja = %s"
         parametros.append(loja)
+    
+    if plataforma == "Wishlist":
+        sql += " AND favorito = TRUE"
+    elif plataforma and plataforma != "Todas":
+        sql += " AND plataforma = %s"
+        parametros.append(plataforma)
     
     if categoria:
         sql += " AND categoria = %s"
