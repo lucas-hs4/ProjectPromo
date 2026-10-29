@@ -86,7 +86,13 @@ def inicializar_banco():
         ADD COLUMN IF NOT EXISTS plataforma VARCHAR(50) DEFAULT 'Editoras';
     """)
     
+    cursor.execute("""
+        ALTER TABLE produtos
+        ADD COLUMN IF NOT EXISTS preco_alvo NUMERIC(10, 2) DEFAULT 0.0;
+    """)
+    
     cursor.execute("UPDATE produtos SET categoria = 'Mangás' WHERE loja = 'NewPOP' AND categoria = 'Excluídos';")
+    #cursor.execute("DELETE FROM produtos WHERE plataforma = 'Amazon' AND favorito = FALSE;")
     
     conexao.commit()
     cursor.close()
@@ -125,7 +131,7 @@ def salvar_leitura(dados, conexao=None):
                 THEN produtos.categoria
                 ELSE EXCLUDED.categoria
             END
-        RETURNING id, (alerta_enviado AND ultimo_alerta IS NOT NULL AND ultimo_alerta > NOW() - INTERVAL '3 days'), favorito;
+        RETURNING id, (alerta_enviado AND ultimo_alerta IS NOT NULL AND ultimo_alerta > NOW() - INTERVAL '3 days'), favorito COALESCE(preco_alvo, 0.0);
     """
     cursor.execute(sql_produto, (dados["nome"], dados["url"], loja, plataforma, imagem_url, categoria))
     
@@ -133,6 +139,7 @@ def salvar_leitura(dados, conexao=None):
     produto_id = resultado_produto[0]
     alerta_ja_enviado = resultado_produto[1]
     eh_favorito = resultado_produto[2]
+    preco_alvo = float(resultado_produto[3])
     
     cursor.execute("""
         SELECT preco_atual, disponivel, status_estoque
@@ -174,7 +181,7 @@ def salvar_leitura(dados, conexao=None):
     if fechar_ao_final:
         conexao.close()
     
-    return produto_id, alerta_ja_enviado, eh_favorito
+    return produto_id, alerta_ja_enviado, eh_favorito, preco_alvo
 
 def atualizar_status_alerta(produto_id, status_booleano):
     """Liga (True) ou desliga (False) a trava de notificação de um produto."""
@@ -205,6 +212,7 @@ def listar_ofertas(desconto_min=0, preco_min=0.0, preco_max=0.0, busca="", loja=
         SELECT COUNT(*) OVER() AS total_geral, * FROM (
             SELECT DISTINCT ON (p.id)
                 p.id, p.nome, p.url, p.loja, p.plataforma, p.imagem_url, p.categoria, p.favorito,
+                COALESCE(p.preco_alvo, 0.0) AS preco_alvo,
                 h.preco_original, h.preco_atual, h.desconto_pct,
                 h.status_estoque, h.disponivel, h.data_consulta,
                 MIN(h.preco_atual) OVER (PARTITION BY p.id) AS menor_preco
@@ -251,6 +259,8 @@ def listar_ofertas(desconto_min=0, preco_min=0.0, preco_max=0.0, busca="", loja=
         sql += " ORDER BY preco_atual ASC, desconto_pct DESC"
     elif ordem == "nome":
         sql += " ORDER BY nome ASC"
+    elif ordem == "recentes":
+        sql += " ORDER BY data_consulta DESC, desconto_pct DESC"
     else:
         sql += " ORDER BY desconto_pct DESC, preco_atual ASC"
         
@@ -292,3 +302,17 @@ def listar_urls_favoritos():
     cursor.close()
     conexao.close()
     return urls
+
+def definir_preco_alvo(produto_id, valor_alvo):
+    """Define uma meta de preço (R$) para o produto e já o coloca na Wishlist."""
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("""
+        UPDATE produtos
+        SET preco_alvo = %s,
+            favorito = CASE WHEN %s > 0 THEN TRUE ELSE favorito END
+        WHERE id = %s;
+    """ (valor_alvo, valor_alvo, produto_id))
+    conexao.commit()
+    cursor.close()
+    conexao.close()

@@ -18,6 +18,10 @@ def enviar_alerta_ntfy(dados, desconto_minimo, eh_favorito=False):
         f"Status: {dados['status']}"
     )
     loja = dados.get("loja", "Panini")
+    plataforma = dados.get("plataforma", "Editoras")
+    origem = f"{plataforma} • {loja}" if plataforma != "Editoras" else loja
+    botao_nome = plataforma if plataforma != "Editoras" else loja
+    
     titulo_alerta = "⭐ [WISHLIST]" if eh_favorito else f"[{loja}] Oferta: {dados['nome']}"
     
     payload = {

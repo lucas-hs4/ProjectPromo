@@ -21,6 +21,7 @@ def index():
     preco_max = request.args.get("preco_max", default=0.0, type=float)
     busca = request.args.get("busca", default="", type=str)
     loja = request.args.get("loja", default="", type=str)
+    plataforma = request.args.get("plataforma", default="Editoras", type=str)
     categoria = request.args.get("categoria", default="", type=str)
     ordem = request.args.get("ordem", default="desconto", type=str)
     apenas_disp = request.args.get("disponiveis") == "1"
@@ -30,7 +31,7 @@ def index():
     if pagina < 1:
         pagina = 1
         
-    ofertas = listar_ofertas(desconto_min, preco_min, preco_max, busca, loja, categoria, apenas_disp, apenas_fav, ordem, pagina, por_pagina)
+    ofertas = listar_ofertas(desconto_min, preco_min, preco_max, busca, loja, categoria, apenas_disp, apenas_fav, ordem, pagina, por_pagina, plataforma)
     
     total_itens = ofertas[0]["total_geral"] if ofertas else 0
     total_paginas = (total_itens + por_pagina - 1) // por_pagina if total_itens > 0 else 1
@@ -47,6 +48,7 @@ def index():
         preco_max= preco_max if preco_max > 0 else "",
         busca=busca,
         loja=loja,
+        plataforma=plataforma,
         categoria=categoria,
         ordem=ordem,
         apenas_disp=apenas_disp,
@@ -62,13 +64,13 @@ def acionar_varredura():
         robo_em_execucao = True
         thread = threading.Thread(target=rodar_robo_background, args=(modo,))
         thread.start()
-    return redirect(url_for("index"))
+    return redirect(request.referrer or url_for("index"))
 
 @app.route("/parar", methods=["POST"])
 def parar_varredura():
     import scraper
     scraper.cancelar_varredura = True
-    return redirect(url_for("index"))
+    return redirect(request.referrer or url_for("index"))
 
 @app.route("/favoritar/<int:produto_id>", methods=["POST"])
 def favoritar(produto_id):
