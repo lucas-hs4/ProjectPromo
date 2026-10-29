@@ -22,22 +22,22 @@ def enviar_alerta_ntfy(dados, desconto_minimo, eh_favorito=False):
     origem = f"{plataforma} • {loja}" if plataforma != "Editoras" else loja
     botao_nome = plataforma if plataforma != "Editoras" else loja
     
-    titulo_alerta = "⭐ [WISHLIST]" if eh_favorito else f"[{loja}] Oferta: {dados['nome']}"
+    titulo_alerta = "⭐ [WISHLIST | {origem}] {dados['nome']}" if eh_favorito else f"[{origem}] Oferta: {dados['nome']}"
     
     payload = {
         "topic": topico,
         "title": titulo_alerta,
-        "mensagem": mensagem,
+        "message": mensagem,
         "priority": 5 if eh_favorito else 4,
-        "tags": ["star", "books"] if eh_favorito else ["books,money_with_wings"],
+        "tags": ["star", "books"] if eh_favorito else ["books", "money_with_wings"],
         "click": dados["url"],
         "actions": [
-            {"action": "view", "label": f"Abrir na {loja}", "url": dados["url"]}
+            {"action": "view", "label": f"Abrir na {botao_nome}", "url": dados["url"]}
         ]
     }
     
     if dados.get("imagem_url"):
-        payload["Attach"] = dados["imagem_url"]
+        payload["attach"] = dados["imagem_url"]
     
     try:
         resposta = httpx.post("https://ntfy.sh", json=payload, timeout=15.0)

@@ -69,20 +69,20 @@ VITRINES_JBC = [
 FILTRO_AMZ = "i=stripbooks&rh=n%3A7842710011%2Cp_n_feature_nine_browse-bin%3A8529758011%2Cp_n_condition-type%3A13862762011%2Cp_n_binding_browse-bin%3A13921567011%7C13921568011"
 
 BUSCAS_AMAZON = [
-    ("Todas : Relevância - Mais vendidos", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=46&Adv-Srch-Books-Submit.y=18&unfiltered=1&ref=sr_adv_b"),
-    ("Todas: Relevância - Lançamento", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A7842710011&s=date-desc-rank&Adv-Srch-Books-Submit.x=46&Adv-Srch-Books-Submit.y=18&qid=1793286371&unfiltered=1&ref=sr_st_date-desc-rank&ds=v1%3AJGh5n%2BUtVzdJ37nBvSahNwYUsbNL5WamFD4Kd5XcGCM"),
-    ("Todas: Popularidade - Mais vendidos", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A7842710011&s=popularity-rank&Adv-Srch-Books-Submit.x=55&Adv-Srch-Books-Submit.y=7&unfiltered=1&ref=sr_adv_b"),
-    ("Todas: Popularidade - Lançamento", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A7842710011&s=date-desc-rank&Adv-Srch-Books-Submit.x=55&Adv-Srch-Books-Submit.y=7&qid=1793286496&unfiltered=1&ref=sr_st_date-desc-rank&ds=v1%3AD0LSy%2FSe3Qcr3NGy577MLNrX5cQ22DUqq35XPgwCi1s"),
-    ("Todas: Graphic Novels", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A6740748011%2Cn%3A7842710011%2Cn%3A7842726011&s=relevancerank&dc&ds=v1%3AGIHSTbxUupX0t7Cdq5sMPvH%2FA0vN%2F%2B6wehP1aEhDdOY&Adv-Srch-Books-Submit.x=67&Adv-Srch-Books-Submit.y=0&qid=1793286857&rnid=7842710011&unfiltered=1&ref=sr_nr_n_1"),
-    ("Todas: Mangás", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A6740748011%2Cn%3A7842710011%2Cn%3A7842714011&s=relevancerank&dc&ds=v1%3A%2Fa9DH9GoTOfdYKOM4Uk6nyp5p3cZQHXMVYOh%2BcyySHY&Adv-Srch-Books-Submit.x=67&Adv-Srch-Books-Submit.y=0&qid=1793286868&rnid=7842710011&unfiltered=1&ref=sr_nr_n_2"),
+    ("Outras", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=46&Adv-Srch-Books-Submit.y=18&unfiltered=1&ref=sr_adv_b"), #Todas : Relevância - Mais vendidos
+    ("Outras", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A7842710011&s=date-desc-rank&Adv-Srch-Books-Submit.x=46&Adv-Srch-Books-Submit.y=18&qid=1793286371&unfiltered=1&ref=sr_st_date-desc-rank&ds=v1%3AJGh5n%2BUtVzdJ37nBvSahNwYUsbNL5WamFD4Kd5XcGCM"), #Todas: Relevância - Lançamento
+    ("Outras", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A7842710011&s=popularity-rank&Adv-Srch-Books-Submit.x=55&Adv-Srch-Books-Submit.y=7&unfiltered=1&ref=sr_adv_b"), #Todas: Popularidade - Mais vendidos
+    ("Outras", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A7842710011&s=date-desc-rank&Adv-Srch-Books-Submit.x=55&Adv-Srch-Books-Submit.y=7&qid=1793286496&unfiltered=1&ref=sr_st_date-desc-rank&ds=v1%3AD0LSy%2FSe3Qcr3NGy577MLNrX5cQ22DUqq35XPgwCi1s"), #Todas: Popularidade - Lançamento
+    ("Outras", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A6740748011%2Cn%3A7842710011%2Cn%3A7842726011&s=relevancerank&dc&ds=v1%3AGIHSTbxUupX0t7Cdq5sMPvH%2FA0vN%2F%2B6wehP1aEhDdOY&Adv-Srch-Books-Submit.x=67&Adv-Srch-Books-Submit.y=0&qid=1793286857&rnid=7842710011&unfiltered=1&ref=sr_nr_n_1"), #Todas: Graphic Novels
+    ("Outras", f"https://www.amazon.com.br/s?i=stripbooks&rh=n%3A6740748011%2Cn%3A7842710011%2Cn%3A7842714011&s=relevancerank&dc&ds=v1%3A%2Fa9DH9GoTOfdYKOM4Uk6nyp5p3cZQHXMVYOh%2BcyySHY&Adv-Srch-Books-Submit.x=67&Adv-Srch-Books-Submit.y=0&qid=1793286868&rnid=7842710011&unfiltered=1&ref=sr_nr_n_2"), #Todas: Mangás
     ("Panini", f"https://www.amazon.com.br/s?k=panini&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=35&Adv-Srch-Books-Submit.y=21&unfiltered=1&ref=sr_adv_b"),
     ("NewPOP", f"https://www.amazon.com.br/s?k=newpop&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=0&Adv-Srch-Books-Submit.y=0&unfiltered=1&ref=sr_adv_b"),
     ("JBC", f"https://www.amazon.com.br/s?k=jbc&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=52&Adv-Srch-Books-Submit.y=7&unfiltered=1&ref=sr_adv_b"),
     ("Pipoca & Nanquim", f"https://www.amazon.com.br/s?k=pipoca+%26+nanquim&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=51&Adv-Srch-Books-Submit.y=13&unfiltered=1&ref=sr_adv_b"),
-    ("Pipoca e Nanquim", f"https://www.amazon.com.br/s?k=pipoca+e+nanquim&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=38&Adv-Srch-Books-Submit.y=13&unfiltered=1&ref=sr_adv_b"),
+    ("Pipoca & Nanquim", f"https://www.amazon.com.br/s?k=pipoca+e+nanquim&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=38&Adv-Srch-Books-Submit.y=13&unfiltered=1&ref=sr_adv_b"), #Pipoca e Nanquim
     ("MPEG", f"https://www.amazon.com.br/s?k=mpeg&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=50&Adv-Srch-Books-Submit.y=14&unfiltered=1&ref=sr_adv_b"),
-    ("DarkSide", f"https://www.amazon.com.br/s?k=darkside&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=56&Adv-Srch-Books-Submit.y=4&unfiltered=1&ref=sr_adv_b"),
-    ("Comix Zone", f"https://www.amazon.com.br/s?k=comix+zone&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=43&Adv-Srch-Books-Submit.y=9&unfiltered=1&ref=sr_adv_b"),
+    ("Outras", f"https://www.amazon.com.br/s?k=darkside&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=56&Adv-Srch-Books-Submit.y=4&unfiltered=1&ref=sr_adv_b"), #DarkSide
+    ("Outras", f"https://www.amazon.com.br/s?k=comix+zone&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=43&Adv-Srch-Books-Submit.y=9&unfiltered=1&ref=sr_adv_b"), #Comix Zone
     ("Outras", f"https://www.amazon.com.br/s?k=outras&i=stripbooks&rh=n%3A7842710011&s=relevancerank&Adv-Srch-Books-Submit.x=55&Adv-Srch-Books-Submit.y=20&unfiltered=1&ref=sr_adv_b"),
 ]
 
@@ -141,7 +141,7 @@ def executar_robo(modo="completo"):
     conexao_db = conectar()
     
     with sync_playwright() as p:
-        if modo == "login-ml":
+        if modo == "login_ml":
             nav_login = p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled"])
             ctx_login = nav_login.new_context(locale="pt-BR", viewport={"width": 1366, "height":768})
             pag_login = ctx_login.new_page()

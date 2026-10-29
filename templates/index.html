@@ -25,7 +25,7 @@
         .btn-verde { background: #00875f; border: 1px solid #00b37e; }
         .btn-verde:hover { background: #00b37e; }
         .menu-varrer { position: relative; display: inline-block; }
-        .menu-varrer-lista { display: none; position: absolute; right: 0;  top: 42px; background: #13111c; border: 1px solid #8257e5; border-radius: 8px; padding: 6px; z-index: 999; win-width: 190px; box-shadow: 0 4px 15px rgba(0,0,0,0.7); flex-direction: column; gap: 5px; }
+        .menu-varrer-lista { display: none; position: absolute; right: 0;  top: 42px; background: #13111c; border: 1px solid #8257e5; border-radius: 8px; padding: 6px; z-index: 999; min-width: 190px; box-shadow: 0 4px 15px rgba(0,0,0,0.7); flex-direction: column; gap: 5px; }
         .menu-varrer-lista.aberto { display: flex; }
         .menu-varrer-lista button { width: 100%; text-align: left; background: #1f1b2e; padding: 8px 12px; font-size: 13px; }
         .menu-varrer-lista button:hover { background: #8257e5; }
@@ -64,7 +64,7 @@
                 <button type="submit" name="modo" value="rapido" class="btn-verde">⚡ Varrer Wihslist</button>
                 {% if plataforma == 'Editoras' %}
                     <div class="menu-varrer">
-                        <button type="button" onclick="document.getElementById('popup-editora').classList.toggle('aberto')">🎯 Varrer Editoras ▾</button>
+                        <button type="button" onclick="document.getElementById('popup-editoras').classList.toggle('aberto')">🎯 Varrer Editoras ▾</button>
                         <div id="popup-editoras" class="menu-varrer-lista">
                             <button type="submit" name="modo" value="Editoras">🏢 Todas as Editoras</button>
                             <button type="submit" name="modo" value="Panini">📕 Só Panini</button>

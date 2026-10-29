@@ -93,6 +93,13 @@ def inicializar_banco():
     
     cursor.execute("UPDATE produtos SET categoria = 'Mangás' WHERE loja = 'NewPOP' AND categoria = 'Excluídos';")
     #cursor.execute("DELETE FROM produtos WHERE plataforma = 'Amazon' AND favorito = FALSE;")
+    cursor.execute("UPDATE FROM produtos WHERE plataforma = 'Amazon' AND (nome ILIKE '%Portuguese Edition%' OR nome ILIKE '%para colorir%');")
+    cursor.execute("SELECT id, nome, loja FROM produtos WHERE plataforma = 'Amazon';")
+    from scraper import identificar_editora
+    for pid, pnome, ploja in cursor.fetchall():
+        nova_ed = identificar_editora(pnome, ploja)
+        nova_cat = identificar_categoria(pnome, nova_ed.lower(), 10.0)
+        cursor.execute("UPDATE produtos SET loja = %s, categoria = %s WHERE id = %s;", (nova_ed, nova_cat, pid))
     
     conexao.commit()
     cursor.close()
@@ -131,7 +138,7 @@ def salvar_leitura(dados, conexao=None):
                 THEN produtos.categoria
                 ELSE EXCLUDED.categoria
             END
-        RETURNING id, (alerta_enviado AND ultimo_alerta IS NOT NULL AND ultimo_alerta > NOW() - INTERVAL '3 days'), favorito COALESCE(preco_alvo, 0.0);
+        RETURNING id, (alerta_enviado AND ultimo_alerta IS NOT NULL AND ultimo_alerta > NOW() - INTERVAL '3 days'), favorito, COALESCE(preco_alvo, 0.0);
     """
     cursor.execute(sql_produto, (dados["nome"], dados["url"], loja, plataforma, imagem_url, categoria))
     
@@ -312,7 +319,7 @@ def definir_preco_alvo(produto_id, valor_alvo):
         SET preco_alvo = %s,
             favorito = CASE WHEN %s > 0 THEN TRUE ELSE favorito END
         WHERE id = %s;
-    """ (valor_alvo, valor_alvo, produto_id))
+    """, (valor_alvo, valor_alvo, produto_id))
     conexao.commit()
     cursor.close()
     conexao.close()

@@ -9,23 +9,50 @@ TERMOS_IGNORADOS = [
     "brasileirao", "copa do mundo", "seleção da copa", "starter pack",
     "chaveiro", "pn toys", "assinatura", "figure",
     "usado", "seminovo", "camiseta", "caneca", "funko", "ecobag",
-    "english edition", "spanish edition", "edição inglês", "[inglês]", "importado"
+    "english edition", "spanish edition", "edição inglês", "[inglês]", "importado",
+    "portuguese edition", "para colorir", "livro de colorir", "coloring booK"
 ]
 
 def identificar_editora(texto, padrao="Outras"):
     """Descobre a editora pelo título ou mantém a editora padrão da busca."""
     t = texto.lower()
-    if "panini" in t or any(p in t for p in ["marvel", "dc comics", "turma da mônica", "invencível", "star wars"]):
+    if any(p in t for p in [
+        "panini", "marvel", "dc comics", "dc de bolso", "dc deluxe", "turma da mônica", "graphic msp",
+        "invencível", "star wars", "homem-aranha", "batman", "superman", "x-men", "vingadores",
+        "demolidor", "wolverine", "lanterna verde", "mulher-maravilha", "deadpool", "spawn", "conan",
+        "one piece", "chainsaw man", "jujutsu kaisen", "demon slayer", "kimetsu no yaiba", "berserk",
+        "naruto", "dragon ball", "spy x family", "frieren", "dandadan", "blue lock", "vagabond",
+        "tokyo ghoul", "jojo's", "jojos", "bleach remix", "one-punch man", "sakamoto days", "kagurabachi",
+        "kusuriya", "diários de uma apotecária", "hanako-kun", "vinland saga", "atelier of witch hat",
+        "gachiakuta", "20th century boys", "pluto:", "monster kanzenban", "slam dunk", "mushoku tensei"
+    ]):
         return "Panini"
-    elif "jbc" in t:
+    elif any(p in t for p in [
+        "jbc", "hunter x hunter", "haikyu", "fullmetal alchemist", "soul eater", "akira", "death note",
+        "cavaleiros do zodíaco", "saint seiya", "inuyasha", "cardcaptor sakura", "sailor moon",
+        "tokyo revengers", "my hero academia", "boku no hero", "yona", "alice in borderland",
+        "fire punch", "blame!", "hellsing", "shaman king", "boa noite punpun", "yomi no tsugai",
+        "xxxholic", "rayearth", "nausicaä", "blade - a lâmina", "astro boy", "bakuman", "zom 100"
+    ]):
         return "JBC"
-    elif "newpop" in t or "new pop" in t:
+    elif any(p in t for p in [
+        "newpop", "new pop", "re:zero", "solo leveling", "mo dao zu shi", "bênção do oficial",
+        "sistema de autopreservação", "ashita no joe", "terra das gemas", "houseki no kuni",
+        "given", "uma vida imortal", "to your eternity", "record of ragnarok", "shuumatsu",
+        "a voz do silêncio", "semantic error", "um sinal de afeto", "mushishi", "toradora", "made in abyss"
+    ]):
         return "NewPOP"
-    elif "pipoca" in t or "nanquim" in t:
+    elif any(p in t for p in [
+        "pipoca", "nanquim", "junji ito", "tomie", "uzumaki", "gyo", "shigurui", "incal",
+        "tartarugas ninja", "último ronin", "lobo solitário", "chushingura", "city hunter", "cat's eye", "cão de caça"
+    ]):
         return "Pipoca & Nanquim"
-    elif "mpeg" in t:
+    elif any(p in t for p in [
+        "mpeg", "gash bell", "beck", "kaoru hana", "hajime no ippo", "sense life",
+        "creamy mami", "nodame cantabile", "omori", "dusk maiden", "10 dance", "como conquistar um alfa"
+    ]):
         return "MPEG"
-    return padrao
+    return padrao if padrao in ["Panini", "JBC", "NewPOP", "Pipoca & Nanquim", "MPEG"] else "Outras"
 
 def extrair_panini(pagina, url_produto):
     print(f"Consultando:: {url_produto}...")
@@ -600,15 +627,17 @@ def extrair_vitrine_jbc(pagina, url_inicial, max_cliques=90, urls_vistas=None):
                 print("[JBC] Botão 'Ver mais' não existe mais na página. Fim da vitrine!")
                 break
             
-            try:
-                clique_num += 1
-                with pagina.expect_response(lambda r: "graphql" in r.url and r.status == 200, timeout=15000):
-                    botao_mais.evaluate("el => { el.scrollIntoView(); el.click(); }")
+            clique_num += 1
+            botao_mais.evaluate("el => { el.scrollIntoView(); el.click(); }")
+            
+            for tentativa in range(24):
                 pagina.wait_for_timeout(500)
+                if len(nos_fila) > 0:
+                    break
+                if tentativa == 10 and botao_mais.count() > 0:
+                    botao_mais.evaluate("el => { el.scrollIntoView(); el.click(); }")
+            pagina.wait_for_timeout(400)
 
-            except Exception as e_click:
-                print(f"[JBC] Fim do carregamento dos botões ({e_click}).")
-                break
             
     except Exception as erro:
         print(f"   [Erro de Rede] Falha na vitrine JBC: {erro}")
@@ -632,10 +661,15 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
         
         try:
             resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000)
+            if resposta.status == 503:
+                print("   [Pausa Anti-503] Amazon pediu fôlego. Aguardando 15s e tentando novamente...")
+                pagina.wait_for_timeout(15000)
+                resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000)
             if resposta.status != 200:
                 print(f"Erro ao acessar Amazon. Status {resposta.status}")
                 break
             pagina.wait_for_selector('div[data-component-type="s-search-result"]', timeout=20000)
+            pagina.wait_for_timeout(2000)
         except Exception as erro:
             print(f"   [Aviso] Pulo na Página {pagina_num} da Amazon: {erro}")
             break
