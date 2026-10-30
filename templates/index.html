@@ -42,7 +42,16 @@
         .btn-fav { position: absolute; top: 10px; left: 10px; background: rgba(19, 17, 28, 0.85); border: 1px solid #4c3d6e; color: #71717a; font-size: 18px; padding: 4px 9px; border-radius: 20px; cursor: pointer; transition: 0.2s; }
         .btn-fav:hover { transform: scale(1.1); }
         .btn-fav.ativo { color: #facc15; border-color: #facc15; background: rgba(250, 204, 21, 0.15); }
-        .menor-preco { font-size: 12px; color: #a78bfa; margin-bottom: 8px; }
+        .btn-alvo { position: absolute; top: 10px; left: 52px; background: rgba(19, 17, 28, 0.85); border: 1px solid #4c3d6e; color: #a1a1aa; font-size: 13px; padding: 6px 8px; border-radius: 20px; cursor: pointer; transition: 0.2s; }
+        .btn-alvo.ativo { color: #04d361; border-color: #04d361; background: rgba(4, 211, 97, 0.15); font-weight: bold; }
+        .menor-preco { font-size: 12px; color: #c4b5fd; margin-bottom: 10px; background: #1f1b2e; border: 1px solid #4c3d6e; padding: 6px 10px; border-radius: 5px; cursor: pointer; width: 100%; text-align: left; transition: 0.2s; }
+        .menor-preco:hover { background: #2e2640; border-color: #996dff; }
+        .modal-fundo { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-caixa { background: #13111c; border: 1px solid #8257e5; border-radius: 10px; padding: 25px; width: 90%; max-width: 650px; max-height: 85vh; overflow-y: auto; box-shadow: 0 0 25px rgba(130, 87, 229, 0.4); }
+        .modal-topo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #2e2640; padding-bottom: 10px; }
+        .tabela-hist { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        .tabela-hist th, .tabela-hist td { padding: 8px 10px; border-bottom: 1px solid #2e2640; text-align: left; }
+        .tabela-hist th { color: #a78bfa; }
         .paginacao { display: flex; justify-content: center; align-items: center; gap: 15px; margin: 30px 0; }
         .paginacao span { color: #c4b5fd; font-weight: bold; }
     </style>
@@ -60,25 +69,39 @@
                 <button type="submit" style="background: #e53935;">🛑 Parar Varredura</button>
             </form>
         {% else %}
-            <form action="/varrer" method="POST" style="display: flex; gap: 10px; align-items: center;">
-                <button type="submit" name="modo" value="rapido" class="btn-verde">⚡ Varrer Wihslist</button>
-                {% if plataforma == 'Editoras' %}
-                    <div class="menu-varrer">
-                        <button type="button" onclick="document.getElementById('popup-editoras').classList.toggle('aberto')">🎯 Varrer Editoras ▾</button>
-                        <div id="popup-editoras" class="menu-varrer-lista">
-                            <button type="submit" name="modo" value="Editoras">🏢 Todas as Editoras</button>
-                            <button type="submit" name="modo" value="Panini">📕 Só Panini</button>
-                            <button type="submit" name="modo" value="NewPOP">📗 Só NewPOP</button>
-                            <button type="submit" name="modo" value="JBC">📘 Só JBC</button>
-                            <button type="submit" name="modo" value="MPEG">📓 Só MPEG</button>
-                            <button type="submit" name="modo" value="Pipoca">📙 Só Pipoca & Nanquim</button>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <form action="/agendar" method="POST" style="margin: 0;">
+                    <select name="intervalo" onchange="this.form.submit()" title="Agendador Automático de Wishlist">
+                        <option value="0" {% if intervalo_auto == 0 %}selected{% endif %}>⏰ Auto: Off</option>
+                        <option value="30" {% if intervalo_auto == 30 %}selected{% endif %}>⏰ Auto: 30 min</option>
+                        <option value="60" {% if intervalo_auto == 60 %}selected{% endif %}>⏰ Auto: 1h</option>
+                        <option value="180" {% if intervalo_auto == 180 %}selected{% endif %}>⏰ Auto: 3h</option>
+                        <option value="300" {% if intervalo_auto == 300 %}selected{% endif %}>⏰ Auto: 3h</option>
+                    </select>
+                </form>
+                <form action="/varrer" method="POST" style="display: flex; gap: 10px; align-items: center; margin: 0;">
+                    <button type="submit" name="modo" value="rapido" class="btn-verde">⚡ Varrer Wihslist</button>
+                    {% if plataforma == 'Mercado Livre' %}
+                        <button type="submit" name="modo" value="modo" value="login_ml" style="background: #eab308; color:#000;">🔑 Login ML (1x)</button>
+                    {% endif %}
+                    {% if plataforma == 'Editoras' %}
+                        <div class="menu-varrer">
+                            <button type="button" onclick="document.getElementById('popup-editoras').classList.toggle('aberto')">🎯 Varrer Editoras ▾</button>
+                            <div id="popup-editoras" class="menu-varrer-lista">
+                                <button type="submit" name="modo" value="Editoras">🏢 Todas as Editoras</button>
+                                <button type="submit" name="modo" value="Panini">📕 Só Panini</button>
+                                <button type="submit" name="modo" value="NewPOP">📗 Só NewPOP</button>
+                                <button type="submit" name="modo" value="JBC">📘 Só JBC</button>
+                                <button type="submit" name="modo" value="MPEG">📓 Só MPEG</button>
+                                <button type="submit" name="modo" value="Pipoca">📙 Só Pipoca & Nanquim</button>
+                            </div>
                         </div>
-                    </div>
-                {% elif plataforma in ['Amazon', 'Mercado Livre'] %}
-                    <button type="submit" name="modo" value="{{ plataforma }}">🎯 Varrer só {{ plataforma }}</button>
-                {% endif %}
-                <button type="submit" name="modo" value="completo" style="background: #2e2640;">🌐 Varrer tudo</button>
-            </form>
+                    {% elif plataforma in ['Amazon', 'Mercado Livre'] %}
+                        <button type="submit" name="modo" value="{{ plataforma }}">🎯 Varrer só {{ plataforma }}</button>
+                    {% endif %}
+                    <button type="submit" name="modo" value="completo" style="background: #2e2640;">🌐 Varrer tudo</button>
+                </form>
+            </div>
         {% endif %}
         </div>
     </div>
@@ -145,6 +168,7 @@
             <select name="ordem">
                 <option value="desconto" {% if ordem == 'desconto' %}selected{% endif %}>Maior % Desconto</option>
                 <option value="preco_menor" {% if ordem == 'preco_menor' %}selected{% endif %}>Menor Preço (R$)</option>
+                <option value="recentes" {% if ordem == 'recentes' %}selected{% endif %}>🔥 Mudanças Recentes</option>
                 <option value="nome" {% if ordem == 'nome' %}selected{% endif %}>Nome (A-Z)</option>
             </select>
         </label>
@@ -176,7 +200,10 @@
         {% for item in ofertas %}
             <div class="card {% if not item.disponivel %}esgotado{% endif %}">
                 <button type="button" class="btn-fav {% if item.favorito %}ativo{% endif %}" onclick="alternarFavorito({{ item.id }}, this)" title="Adicionar/Remover da Wishlist">⭐</button>
-                {% if item.desconto_pct > 0 %}
+                <button type="button" class="btn-alvo {% if item.preco_alvo > 0 %}ativo{% endif %}" onclick="definirAlvo({{ item.id }}, {{ item.preco_alvo }}, this)" title="Definir Preço Alvo (R$)">
+                    🎯{% if item.preco_alvo > 0 %} R$ {{ "%.0f"|format(item.preco_alvo) }}{% endif %}
+                </button>
+                    {% if item.desconto_pct > 0 %}
                     <span class="badge-desconto">-{{ item.desconto_pct }}%</span>
                 {% endif %}
 
@@ -191,7 +218,7 @@
                         <div class="preco-antigo">De: R$ {{ "%.2f"|format(item.preco_original) }}</div>
                     {% endif %}
                     <div class="preco-atual">R$ {{ "%.2f"|format(item.preco_atual) }}</div>
-                    <div class="menor-preco">📉 Menor já visto: R$ {{ "%.2f"|format(item.menor_preco) }}</div>
+                    <button type="button" class="menor-preco" onclick='abrirHistorico({{ item.id }}, {{ item.nome|tojson }})'>📉 Menor já visto: R$ {{ "%.2f"|format(item.menor_preco) }} (ver gráfico)</button>
                     <a href="{{ item.url }}" target="_blank" class="btn-link" style="display: block; text-align: center;">Abrir na {{ item.plataforma if item.plataforma != 'Editoras' else item.loja }}</a>
                 </div>
             </div>
@@ -212,7 +239,65 @@
     </div>
     {% endif %}
 
+    <div id="modal-historico" class="modal-fundo oculto" onclick="if(event.target===this) fecharHistorico()">
+        <div class="modal-caixa">
+            <div class="modal-topo">
+                <h3 id="modal-titulo" style="margin: 0; color: #c4b5fd; font-size: 16px;">Histórico</h3>
+                <button type="button" onclick="fecharHistorico()" style="background: #2e2640; padding: 6px 12px;">✕</button>
+            </div>
+            <div id="modal-grafico"></div>
+            <table class="tabela-hist">
+                <thead>
+                    <tr><th>Data da Leitura</th><th>Preço</th><th>Desconto</th><th>Status</th></tr>
+                </thead>
+                <tbody id="modal-tabela"></tbody>
+            </table>
+        </div>
+    </div>
+
     <script>
+        async function abrirHistorico(id, nome) {
+            document.getElementById('modal-titulo').innerText = '📊 ' + nome;
+            document.getElementById('modal-historico').classList.remove('oculto');
+            const resp = await fetch(`/historico/${id}`);
+            const dados = await resp.json();
+
+            const tbody = document.getElementById('modal-tabela');
+            tbody.innerHTML = dados.slice().reverse().map(d => `
+                <tr>
+                    <td>${d.data_formatada}</td>
+                    <td style="color: #04d361; font-weight: bold;">R$ ${d.preco_atual.toFixed(2)}</td>
+                    <td>-${d.desconto_pct}%</td>
+                    <td>${d.status_estoque}</td>
+                </tr>
+            `).join('');
+
+            const precos = dados.map(d => d.preco_atual);
+            const minP = Math.min(...precos);
+            const maxP = Math.max(...precos);
+            const largura = 580, altura = 160, pag =25;
+
+            const pontos = dados.map((d, i) => {
+                const x = dados.length > 1 ? pad + (i / (dados.length - 1)) * (largura - pad * 2) : largura / 2;
+                const y = maxP > minP ? (altura - pad) - ((d.preco_atual - minP) / (maxP - minP)) * (altura - pad * 2) : altura / 2;
+                return `${x},${y}`;
+            }).join(' ');
+
+            document.getElementById('modal-grafico').innerHTML = `
+                <svg viewBox="0 0 ${largura} ${altura}"style="width: 100%; background: #09090b; border-radius: 8px; border: 1px solid #3e2640;">
+                    <polyline fill="none" stroke="#8257e5" stroke-width="3" points="${pontos}" />
+                    ${dados.map((d, i) => {
+                        const [x, y] = pontos.split(' ')[i].split(',');
+                        return `<circle cx="${x}" cy="${y}" r="5" fill="#04d361"><title>${d.data_formatada}: R$ ${d.preco_atual.toFixed(2)}</title></circle>`;
+                    }).join('')}
+                </svg>
+            `;
+        }
+
+        function fecharHistorico() {
+            document.getElementById('modal-historico').classList.add('oculto');
+        }
+
         function alternarMenu() {
             const ids = ['painel-botoes', 'painel-abas', 'painel-filtros'];
             ids.forEach(id => document.getElementById(id).classList.toggle('oculto'));
@@ -228,6 +313,23 @@
             const resp = await fetch(`/favoritar/${id}`, { method: 'POST' });
             const dados = await resp.json();
             botao.classList.toggle('ativo', dados.favorito);
+        }
+        
+        async function definirAlvo(id, botao) {
+            const entrada = prompt("🎯 Digite o Preço Alvo em R$ para receber alerta (ou 0 para remover):", atual > 0 ? atual : "");
+            if (entrada === null) return;
+            const valor = parseFloat(entrada.replace(",", ".")) || 0;
+            const resp = await fetch(`/meta/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ preco_alvo: valor })
+            });
+            const dados = await resp.json();
+            botao.classList.toggle('ativo', dados.preco_alvo > 0);
+            botao.innerText = dados.preco_alvo > 0 ? `🎯 R$ ${dados.preco_alvo.toFixed(0)}` : '🎯';
+            if (dados.preco_alvo > 0) {
+                botao.parentElement.querySelector('.btn-fav').classList.add('ativo');
+            }
         }
 
         function irParaPagina(numPagina) {

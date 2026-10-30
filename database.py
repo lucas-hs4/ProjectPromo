@@ -93,8 +93,18 @@ def inicializar_banco():
     
     cursor.execute("UPDATE produtos SET categoria = 'Mangás' WHERE loja = 'NewPOP' AND categoria = 'Excluídos';")
     #cursor.execute("DELETE FROM produtos WHERE plataforma = 'Amazon' AND favorito = FALSE;")
-    cursor.execute("UPDATE FROM produtos WHERE plataforma = 'Amazon' AND (nome ILIKE '%Portuguese Edition%' OR nome ILIKE '%para colorir%');")
-    cursor.execute("SELECT id, nome, loja FROM produtos WHERE plataforma = 'Amazon';")
+    cursor.execute("""
+        DELETE FROM produtos
+        WHERE plataforma = 'Amazon'
+            AND favorito = FALSE
+            AND (
+                categoria = 'Excluídos'
+                OR nome ILIKE ANY (ARRAY['%Portuguese Edition%', '%Chinese Edition%', '%para colorir%', '%MPEG-7%', '%MPEG-2%', '%DivX%', '%Supremo Tribunal%', 'Supremo Tibunal'])
+                OR (loja = 'Outras' AND nome ILIKE ANY (ARRAY['%outra%', '%outro%']))
+            );
+    """)
+    
+    cursor.execute("SELECT id, nome, loja FROM produtos WHERE plataforma = 'Amazon' AND loja LIKE 'Todas%';")
     from scraper import identificar_editora
     for pid, pnome, ploja in cursor.fetchall():
         nova_ed = identificar_editora(pnome, ploja)
@@ -309,6 +319,27 @@ def listar_urls_favoritos():
     cursor.close()
     conexao.close()
     return urls
+
+def buscar_historico_produto(produto_id):
+    """Retorna todas as leituras de preço de um produto em ordem cronológica."""
+    conexao = conectar()
+    cursor = conexao.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("""
+        SELECT
+            TO_CHAR(data_consulta, 'DD/MM/YYYY HH24:MI') AS data_formatada,
+            FLOAT8(preco_original) AS preco_original,
+            FLOAT8(preco_atual) AS preco_atual,
+            desconto_pct,
+            status_estoque,
+            disponivel
+        FROM historico_precos
+        WHERE produto_id = %s
+        ORDER BY data_consulta ASC;
+    """, (produto_id,))
+    historico = cursor.fetchall()
+    cursor.close()
+    conexao.close()
+    return historico
 
 def definir_preco_alvo(produto_id, valor_alvo):
     """Define uma meta de preço (R$) para o produto e já o coloca na Wishlist."""

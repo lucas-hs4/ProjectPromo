@@ -22,7 +22,7 @@ def enviar_alerta_ntfy(dados, desconto_minimo, eh_favorito=False):
     origem = f"{plataforma} • {loja}" if plataforma != "Editoras" else loja
     botao_nome = plataforma if plataforma != "Editoras" else loja
     
-    titulo_alerta = "⭐ [WISHLIST | {origem}] {dados['nome']}" if eh_favorito else f"[{origem}] Oferta: {dados['nome']}"
+    titulo_alerta = f"⭐ [WISHLIST | {origem}] {dados['nome']}" if eh_favorito else f"[{origem}] Oferta: {dados['nome']}"
     
     payload = {
         "topic": topico,

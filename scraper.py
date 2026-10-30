@@ -10,7 +10,8 @@ TERMOS_IGNORADOS = [
     "chaveiro", "pn toys", "assinatura", "figure",
     "usado", "seminovo", "camiseta", "caneca", "funko", "ecobag",
     "english edition", "spanish edition", "edição inglês", "[inglês]", "importado",
-    "portuguese edition", "para colorir", "livro de colorir", "coloring booK"
+    "portuguese edition", "para colorir", "livro de colorir", "coloring book",
+    "mpeg-", "divx"
 ]
 
 def identificar_editora(texto, padrao="Outras"):
@@ -762,6 +763,9 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
         if botao_prox.count() > 0 and pagina_num < max_paginas:
             prox_href = botao_prox.get_attribute("href")
             url_atual = f"https://www.amazon.com.br{prox_href}" if prox_href.startswith("/") else prox_href
+            if "rh=" in url_inicial and "rh=" not in url_atual:
+                rh_original = [p for p in url_inicial.split("&") if p.startswith("rh=")][0]
+                url_atual += f"&i=stripbooks&{rh_original}"
             pagina_num += 1
         else:
             url_atual = None

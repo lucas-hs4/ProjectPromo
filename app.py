@@ -1,11 +1,13 @@
+import time
 import threading
 from flask import Flask, render_template, request, redirect, url_for, jsonify
-from database import inicializar_banco, listar_ofertas, alternar_favorito
+from database import inicializar_banco, listar_ofertas, alternar_favorito, buscar_historico_produto, definir_preco_alvo
 from main import executar_robo
 
 app = Flask(__name__)
 
 robo_em_execucao = False
+intervalo_auto_min = 0
 
 def rodar_robo_background(modo="completo"):
     global robo_em_execucao
@@ -14,6 +16,21 @@ def rodar_robo_background(modo="completo"):
     finally:
         robo_em_execucao = False
         
+        
+def loop_agendador():
+    """Verifica a cada minuto se está na hora de disparar a varredura automática."""
+    global robo_em_execucao
+    ultimo_disparo = time.time()
+    while True:
+        time.sleep(30)
+        if intervalo_auto_min > 0 and not robo_em_execucao:
+            if (time.time() - ultimo_disparo) >= (intervalo_auto_min * 60):
+                robo_em_execucao = True
+                ultimo_disparo = time.time()
+                threading.Thread(target=rodar_robo_background, args=("rapido",), daemon=True).start()
+                
+threading.Thread(target=loop_agendador, daemon=True).start()               
+
 @app.route("/")
 def index():
     desconto_min = request.args.get("desconto_min", default=0, type=int)
@@ -53,7 +70,8 @@ def index():
         ordem=ordem,
         apenas_disp=apenas_disp,
         apenas_fav=apenas_fav,
-        robo_rodando=robo_em_execucao
+        robo_rodando=robo_em_execucao,
+        intervalo_auto=intervalo_auto_min
     )
     
 @app.route("/varrer", methods=["POST"])
@@ -80,6 +98,24 @@ def favoritar(produto_id):
 @app.route("/status_robo")
 def status_robo():
     return jsonify({"rodando": robo_em_execucao})
+
+@app.route("/historico/<int:produto_id>")
+def historico_produto(produto_id):
+    dados = buscar_historico_produto(produto_id)
+    return jsonify (dados)
+
+@app.route("/meta/<int:produto_id>", methods=["POST"])
+def salvar_meta(produto_id):
+    dados = request.get_json() or {}
+    valor = float(dados.get("preco_alvo", 0.0))
+    definir_preco_alvo(produto_id, valor)
+    return jsonify({"preco_alvo": valor})
+
+@app.route("/agendar", methods=["POST"])
+def configurar_agendador():
+    global intervalo_auto_min
+    intervalo_auto_min = request.form.get("intervalo", default=0, type=int)
+    return redirect(request.referrer or url_for())
 
 if __name__ == "__main__":
     inicializar_banco()
