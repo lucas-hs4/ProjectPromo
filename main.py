@@ -160,7 +160,8 @@ from datetime import datetime
 
 def executar_robo(modo="completo"):
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 🚀 Iniciando varredura ({modo})...")
-    ctypes.windll.kernel32.SetThreadExecutionState(0x80000001)
+    if hasattr(ctypes, "windll"):
+        ctypes.windll.kernel32.SetThreadExecutionState(0x80000001)
     scraper.cancelar_varredura = False
     inicializar_banco()
     conexao_db = conectar()
@@ -268,7 +269,8 @@ def executar_robo(modo="completo"):
         conexao_db.close()
         print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ Varredura concluída com sucesso!")
     
-    ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
+    if hasattr(ctypes, "windll"):
+        ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
 
 if __name__ == "__main__":
     executar_robo()
