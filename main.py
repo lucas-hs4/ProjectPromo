@@ -14,12 +14,12 @@ DESCONTO_MINIMO_WISHLIST = 20
 DESCONTO_MINIMO_PCT = 70
 
 VITRINES_MONITORADAS = [
-    #("Marvel", f"https://panini.com.br/marvel?product_list_limit=36"),
-    #("Mangás", f"https://panini.com.br/planet-manga?product_list_limit=36"),
-    #("DC", f"https://panini.com.br/dc-comics?product_list_limit=36"),
-    #("Livros/Novels",f"https://panini.com.br/panini-books?product_list_limit=36"),
-    #("Outras HQs", f"https://panini.com.br/panini-comics?product_list_limit=36"),
-    #("Turma da Mônica", f"https://panini.com.br/mauricio-de-sousa-catalogo?product_list_limit=36"),
+    ("Marvel", f"https://panini.com.br/marvel?product_list_limit=36"),
+    ("Mangás", f"https://panini.com.br/planet-manga?product_list_limit=36"),
+    ("DC", f"https://panini.com.br/dc-comics?product_list_limit=36"),
+    ("Livros/Novels",f"https://panini.com.br/panini-books?product_list_limit=36"),
+    ("Outras HQs", f"https://panini.com.br/panini-comics?product_list_limit=36"),
+    ("Turma da Mônica", f"https://panini.com.br/mauricio-de-sousa-catalogo?product_list_limit=36"),
     #"https://panini.com.br/novidades/pre-vendas?product_list_limit=36", #Pré-venda
     #"https://panini.com.br/novidades/reimpressao?product_list_limit=36", #Reimpressão
     #"https://panini.com.br/desconto-saldao?product_list_limit=36", #Saldão
@@ -30,12 +30,12 @@ VITRINES_MONITORADAS = [
 ]
 
 VITRINES_NEWPOP = [
-    #"https://www.lojanewpop.com.br/",
-    #"https://www.lojanewpop.com.br/mangas",
-    #"https://www.lojanewpop.com.br/one-shots",
-    #"https://www.lojanewpop.com.br/livrosnovels-",
-    #"https://www.lojanewpop.com.br/nacionais",
-    #"https://www.lojanewpop.com.br/pre-venda",
+    "https://www.lojanewpop.com.br/",
+    "https://www.lojanewpop.com.br/mangas",
+    "https://www.lojanewpop.com.br/one-shots",
+    "https://www.lojanewpop.com.br/livrosnovels-",
+    "https://www.lojanewpop.com.br/nacionais",
+    "https://www.lojanewpop.com.br/pre-venda",
     #"https://www.lojanewpop.com.br/pacotes",
     #"https://www.lojanewpop.com.br/marca/aca.html",
     #"https://www.lojanewpop.com.br/marca/aventura.html",
@@ -48,18 +48,18 @@ VITRINES_NEWPOP = [
 ]
 
 VITRINES_PIPOCA = [
-    #"https://pipocaenanquim.com.br/mangas.html",
-    #"https://pipocaenanquim.com.br/quadrinhos.html",
-    #"https://pipocaenanquim.com.br/livros.html",
-    #"https://pipocaenanquim.com.br/colec-o.html",
+    "https://pipocaenanquim.com.br/mangas.html",
+    "https://pipocaenanquim.com.br/quadrinhos.html",
+    "https://pipocaenanquim.com.br/livros.html",
+    "https://pipocaenanquim.com.br/colec-o.html",
     #"https://pipocaenanquim.com.br/promoc-o.html",
     #"https://pipocaenanquim.com.br/pre-vendas.html",
 ]
 
 VITRINES_MPEG = [
-    #"https://mpeg.com.br/mangas?product_list_limit=36",
-    #"https://mpeg.com.br/novels?product_list_limit=36",
-    #"https://mpeg.com.br/prevendas?product_list_limit=36",
+    "https://mpeg.com.br/mangas?product_list_limit=36",
+    "https://mpeg.com.br/novels?product_list_limit=36",
+    "https://mpeg.com.br/prevendas?product_list_limit=36",
 ]
 
 VITRINES_JBC = [
@@ -199,7 +199,9 @@ def executar_robo(modo="completo"):
         if modo =="rapido":
             urls_diretas = listar_urls_favoritos() + URLS_INDIVIDUAIS
             for url in urls_diretas:
-                if scraper.cancelar_varredura or url in urls_ja_varridas:
+                if scraper.cancelar_varredura:
+                    break
+                if url in urls_ja_varridas:
                     continue
                 urls_ja_varridas.add(url)
                 if "lojanewpop.com.br" in url:

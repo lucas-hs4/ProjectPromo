@@ -115,7 +115,7 @@ def salvar_meta(produto_id):
 def configurar_agendador():
     global intervalo_auto_min
     intervalo_auto_min = request.form.get("intervalo", default=0, type=int)
-    return redirect(request.referrer or url_for())
+    return redirect(request.referrer or url_for("index"))
 
 if __name__ == "__main__":
     inicializar_banco()

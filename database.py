@@ -105,11 +105,14 @@ def inicializar_banco():
     """)
     
     cursor.execute("SELECT id, nome, loja FROM produtos WHERE plataforma = 'Amazon' AND loja LIKE 'Todas%';")
+    
     from scraper import identificar_editora
     for pid, pnome, ploja in cursor.fetchall():
         nova_ed = identificar_editora(pnome, ploja)
         nova_cat = identificar_categoria(pnome, nova_ed.lower(), 10.0)
         cursor.execute("UPDATE produtos SET loja = %s, categoria = %s WHERE id = %s;", (nova_ed, nova_cat, pid))
+        
+    cursor.execute("DELETE FROM historico_precos WHERE preco_atual <= 0;")
     
     conexao.commit()
     cursor.close()
@@ -167,6 +170,12 @@ def salvar_leitura(dados, conexao=None):
     """, (produto_id,))
     
     ultima_leitura = cursor.fetchone()
+    
+    if float(dados["preco_atual"]) <= 0.0 and ultima_leitura is not None:
+        dados["preco_atual"] = float(ultima_leitura[0])
+        if float(dados["preco_original"]) < dados["preco_atual"]:
+            dados["preco_original"] = dados["preco_atual"]
+        dados["desconto_pct"] = round(((dados["preco_original"] - dados["preco_atual"]) / dados["preco_original"]) * 100) if dados["preco_original"] > dados["preco_atual"] else 0
     
     mudou_estado = (
         ultima_leitura is None

@@ -777,28 +777,52 @@ def extrair_amazon(pagina, url_produto):
     print(f"Consultando Amazon: {url_produto}...")
     try:
         pagina.goto(url_produto, wait_until="domcontentloaded", timeout=60000)
+        pagina.wait_for_timeout(1500)
+        
+        if pagina.locator("#productTitle").count() == 0:
+            print(f"   [Aviso Amazon] Página bloqueada (Captcha) ou titulo não carregou: {url_produto}")
+            return None
+        
         titulo = pagina.locator("#productTitle").first.inner_text().strip()
         img_el = pagina.locator("#landingImage, #imgBlkFront").first
         imagem_url = img_el.get_attribute("src") if img_el.count() > 0 else ""
         
-        loc_atual = pagina.locator('#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen, #corePrice_feature_div .a-offscreen').first
+        loc_atual = pagina.locator(
+            '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen, '
+            '#corePriceDisplay_desktop_feature_div .apexPriceToPay .a-offscreen, '
+            '#corePrice_feature_div .a-offscreen, '
+            '#tmmSwatches .swatchElement.selected .slot-price span'
+        ).first
         preco_atual = limpar_preco_br(loc_atual.text_content()) if loc_atual.count() > 0 else 0.0
         
-        loc_antigo = pagina.locator('#corePriceDisplay_desktop_feature_div .basisPrice .a-offscreen, span[data-a-strike="true"] .a-offscreen').first
-        preco_original = limpar_preco_br(loc_antigo.text_content()) if loc_antigo.count() > 0 else preco_atual
+        if preco_atual <= 0.0:
+            inteiro = pagina.locator('#corePriceDisplay_desktop_feature_div .a-price-whole').first
+            centavos = pagina.locator('#corePriceDisplay_desktop_feature_div .a-price-fraction').first
+            if inteiro.count() > 0:
+                txt_int = inteiro.inner_text().replace(".", "").replace(",", "").strip()
+                txt_cent = centavos.inner_text().strip() if centavos.count() > 0 else "00"
+                preco_atual = limpar_preco_br(f"{txt_int},{txt_cent}")
         
-        desconto_pct = round(((preco_original - preco_atual) / preco_original) * 100) if preco_original > preco_atual else 0
+        loc_antigo = pagina.locator(
+            '#corePriceDisplay_desktop_feature_div .basisPrice .a-offscreen, '
+            'span[data-a-strike="true"] .a-offscreen'
+        ).first
+        preco_original = limpar_preco_br(loc_antigo.text_content()) if loc_antigo.count() > 0 else preco_atual
+        if preco_original < preco_atual or preco_atual <= 0.0:
+            preco_original = preco_atual
+        
+        desconto_pct = round(((preco_original - preco_atual) / preco_original) * 100) if (preco_atual > 0 and preco_original > preco_atual) else 0
         disponivel = preco_atual > 0.0 and pagina.locator("#add-to-cart-button, #buy-now-button").count() > 0
         status_estoque = "Em estoque" if disponivel else "Indisponível"
         
         texto_pag = pagina.locator("#bylineInfo, #detailBullets_feature_div").all_inner_texts()
         texto_ed = " ".join(texto_pag).lower()
-        editora = "JBC" if "jbc" in texto_ed else ("NewPOP" if "newpop" in texto_ed else ("Pipoca & Nanquim" if "pipoca" in texto_ed else ("MPEG" if "mpeg" in texto_ed else "Panini")))
+        editora = identificar_editora(f"{titulo} {texto_ed}", "Outras")
         
         return {
             "plataforma": "Amazon",
             "loja": editora,
-            "categoria": identificar_categoria(titulo, editora.lower(), preco_atual),
+            "categoria": identificar_categoria(titulo, editora.lower(), preco_atual if preco_atual > 0 else 10.0),
             "nome": titulo,
             "url": url_produto,
             "imagem_url": imagem_url,

@@ -76,13 +76,15 @@
                         <option value="30" {% if intervalo_auto == 30 %}selected{% endif %}>⏰ Auto: 30 min</option>
                         <option value="60" {% if intervalo_auto == 60 %}selected{% endif %}>⏰ Auto: 1h</option>
                         <option value="180" {% if intervalo_auto == 180 %}selected{% endif %}>⏰ Auto: 3h</option>
-                        <option value="300" {% if intervalo_auto == 300 %}selected{% endif %}>⏰ Auto: 3h</option>
+                        <option value="360" {% if intervalo_auto == 360 %}selected{% endif %}>⏰ Auto: 6h</option>
+                        <option value="720" {% if intervalo_auto == 720 %}selected{% endif %}>⏰ Auto: 12h</option>
+                        <option value="1440" {% if intervalo_auto == 1440 %}selected{% endif %}>⏰ Auto:24h</option>
                     </select>
                 </form>
                 <form action="/varrer" method="POST" style="display: flex; gap: 10px; align-items: center; margin: 0;">
-                    <button type="submit" name="modo" value="rapido" class="btn-verde">⚡ Varrer Wihslist</button>
+                    <button type="submit" name="modo" value="rapido" class="btn-verde">⚡ Varrer Wishlist</button>
                     {% if plataforma == 'Mercado Livre' %}
-                        <button type="submit" name="modo" value="modo" value="login_ml" style="background: #eab308; color:#000;">🔑 Login ML (1x)</button>
+                        <button type="submit" name="modo" value="login_ml" style="background: #eab308; color:#000;">🔑 Login ML (1x)</button>
                     {% endif %}
                     {% if plataforma == 'Editoras' %}
                         <div class="menu-varrer">
@@ -275,7 +277,7 @@
             const precos = dados.map(d => d.preco_atual);
             const minP = Math.min(...precos);
             const maxP = Math.max(...precos);
-            const largura = 580, altura = 160, pag =25;
+            const largura = 580, altura = 160, pad = 25;
 
             const pontos = dados.map((d, i) => {
                 const x = dados.length > 1 ? pad + (i / (dados.length - 1)) * (largura - pad * 2) : largura / 2;
@@ -315,7 +317,7 @@
             botao.classList.toggle('ativo', dados.favorito);
         }
         
-        async function definirAlvo(id, botao) {
+        async function definirAlvo(id, atual, botao) {
             const entrada = prompt("🎯 Digite o Preço Alvo em R$ para receber alerta (ou 0 para remover):", atual > 0 ? atual : "");
             if (entrada === null) return;
             const valor = parseFloat(entrada.replace(",", ".")) || 0;
