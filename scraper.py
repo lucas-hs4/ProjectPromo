@@ -7,7 +7,7 @@ TERMOS_IGNORADOS = [
     "figurinha", "álbum", "album","cromo", "envelope",
     "adrenalyn", "fifa", "libertadores", "brasileirão",
     "brasileirao", "copa do mundo", "seleção da copa", "starter pack",
-    "chaveiro", "pn toys", "assinatura", "figure",
+    "chaveiro", "pn toys", "figure",
     "usado", "seminovo", "camiseta", "caneca", "funko", "ecobag",
     "english edition", "spanish edition", "edição inglês", "[inglês]", "importado",
     "portuguese edition", "para colorir", "livro de colorir", "coloring book",
@@ -163,7 +163,7 @@ def extrair_vitrine_panini(pagina, url_inicial, max_paginas=100, urls_vistas=Non
         print(f"[Crawler] Varrendo Página {pagina_num}: {url_atual}...")
     
         try:
-            resposta = pagina.goto(url_atual, wait_until="commit", timeout=60000)
+            resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000)
             if resposta.status != 200:
                 print(f"Erro ao acessar a vitrine. Status: {resposta.status}")
                 break
@@ -223,7 +223,7 @@ def identificar_categoria(nome, url_contexto="", preco_atual=10.0):
     
     if "tartarugas ninja" in texto or "ultimo ronin" in texto or "último ronin" in texto:
         return "As Tartarugas Ninja"
-    if "/disney" in texto or "disney" in texto or any(d in texto for d in ["mickey", "pato donald", "donald", "ducktales", "duck tales", "mickey e pateta", "tio patinhas", "minnie", "pateta"]):
+    if "/disney" in texto or "disney" in texto or any(d in texto for d in ["mickey", "pato donald", "donald", "ducktales", "duck tales", "mickey e pateta", "tio patinhas", "minnie", "pateta", "19.999 léguas submarinas", "Histórias de Esportes"]):
         return "Disney"
     if "/invencivel" in texto or "invencível" in texto or "invencivel" in texto:
         return "Invencível"
@@ -237,11 +237,11 @@ def identificar_categoria(nome, url_contexto="", preco_atual=10.0):
         return "The Walking Dead"
     elif "/panini-books" in texto or "/novels" in texto or "novel" in texto or "livro" in texto or "livros.html" in texto or "livrosnovels" in texto:
         return "Novels & Livros"
-    elif "/marvel" in texto or any(h in texto for h in ["homem-aranha","homem de ferro", "viúva negra", "viuva negra", "viúva-negra", "aranha", "vingadores", "x-men", "wolverine", "demolidor", "thor", "capitão américa", "capitao américa", "hulk", "deadpool", "quarteto fantástico", "surfista prateado"]):
+    elif "/marvel" in texto or any(h in texto for h in ["marvel", "homem-aranha","homem de ferro", "viúva negra", "viuva negra", "viúva-negra", "aranha", "vingadores", "x-men", "wolverine", "demolidor", "thor", "capitão américa", "capitao américa", "hulk", "deadpool", "quarteto fantástico", "surfista prateado", "venom", "doutor estranho"]):
         return "Marvel"
-    elif "/dc-comics" in texto or "dc+comics" in texto or any(h in texto for h in ["batman", "superman", "mulher-maravilha", "liga da justiça", "flash", "lanterna verde", "asa noturna", "coringa", "sandman", "arlequina", "watchmen", "juízo final", "heróis em crise", "herois em crise", "robin", "shazam"]):
+    elif "/dc-comics" in texto or "dc+comics" in texto or any(h in texto for h in ["dc", "batman", "superman", "mulher-maravilha", "liga da justiça", "flash", "lanterna verde", "asa noturna", "coringa", "sandman", "arlequina", "watchmen", "juízo final", "heróis em crise", "herois em crise", "robin", "shazam", "A Saga Dos Superfilhos", "Gordon: Lei & Ordem", "esquadrão suicida"]):
         return "DC Comics"
-    elif "/planet-manga" in texto or "planet+manga" in texto or "lojanewpop" in texto or "mpeg.com.br" in texto or "mangas.html" in texto or any(m in texto for m in ["junji ito", "shigurui", "city hunter", "cat's eye", "cats eye", "chushingura", "battle royale", "one piece", "berserk", "naruto", "dragon ball", "demon slayer", "jujutsu", "tokyo ghoul", "chainsaw man"]):
+    elif "/planet-manga" in texto or "planet+manga" in texto or "lojanewpop" in texto or "mpeg.com.br" in texto or "mangas.html" in texto or any(m in texto for m in ["junji ito", "shigurui", "city hunter", "cat's eye", "cats eye", "chushingura", "battle royale", "one piece", "berserk", "naruto", "dragon ball", "demon slayer", "jujutsu", "tokyo ghoul", "chainsaw man", "mashle", "re:zero", "katana beast", "record of ragnarok", "one punch man", "hokuto no ken", "the ghost in the shell", "devil exstasy", "zero no tsukaima", "aku no hana", "ragna crimson", "tower of god"]):
         return "Mangás"
     elif "/mauricio-de-sousa-catalogo" in texto or "mauricio" in texto or "mônica" in texto or "monica" in texto or "cebolinha" in texto or "cascão" in texto or "magali" in texto or "chico bento" in texto or "xaveco" in texto or "tina" in texto or "saiba mais" in texto:
         return "Turma da Mônica"
@@ -437,11 +437,12 @@ def extrair_vitrine_pipoca(pagina, url_inicial, max_paginas=100, urls_vistas=Non
         print(f"\n[{loja_nome}] Varrendo Página {pagina_num}: {url_atual}...")
         
         try:
-            resposta = pagina.goto(url_atual, wait_until="commit", timeout=60000)
+            resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000)
             if resposta.status != 200:
                 print(f"Erro ao acessar Pipoca & Nanquim. Status: {resposta.status}")
                 break
             pagina.wait_for_selector("div.products-grid, ol.widget-product-carousel", timeout=30000)
+            pagina.wait_for_timeout(800)
         except Exception as erro:
             print(f"   [Erro de Rede] Falha em Pipoca & Nanquim: {erro}")
             break
@@ -663,8 +664,8 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
         try:
             resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000)
             if resposta.status == 503:
-                print("   [Pausa Anti-503] Amazon pediu fôlego. Aguardando 15s e tentando novamente...")
-                pagina.wait_for_timeout(15000)
+                print("   [Pausa Anti-503] Amazon pediu fôlego. Aguardando 20s e tentando novamente...")
+                pagina.wait_for_timeout(20000)
                 resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000)
             if resposta.status != 200:
                 print(f"Erro ao acessar Amazon. Status {resposta.status}")

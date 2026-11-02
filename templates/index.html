@@ -44,6 +44,8 @@
         .btn-fav.ativo { color: #facc15; border-color: #facc15; background: rgba(250, 204, 21, 0.15); }
         .btn-alvo { position: absolute; top: 10px; left: 52px; background: rgba(19, 17, 28, 0.85); border: 1px solid #4c3d6e; color: #a1a1aa; font-size: 13px; padding: 6px 8px; border-radius: 20px; cursor: pointer; transition: 0.2s; }
         .btn-alvo.ativo { color: #04d361; border-color: #04d361; background: rgba(4, 211, 97, 0.15); font-weight: bold; }
+        .btn-edit { position: absolute; top: 10px; left: 105px; background: rgba(19, 17, 28, 0.85); border: 1px solid #4c3d6e; color: #a1a1aa; font-size: 13px; padding: 6px 8px; border-radius: 20px; cursor: pointer; transition: 0.2s; }
+        .btn-edit.ativo { color: #c4b5fd; border-color: #8257e5; background: rgba(130, 87, 229, 0.2); }
         .menor-preco { font-size: 12px; color: #c4b5fd; margin-bottom: 10px; background: #1f1b2e; border: 1px solid #4c3d6e; padding: 6px 10px; border-radius: 5px; cursor: pointer; width: 100%; text-align: left; transition: 0.2s; }
         .menor-preco:hover { background: #2e2640; border-color: #996dff; }
         .modal-fundo { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
@@ -78,10 +80,12 @@
                         <option value="180" {% if intervalo_auto == 180 %}selected{% endif %}>⏰ Auto: 3h</option>
                         <option value="360" {% if intervalo_auto == 360 %}selected{% endif %}>⏰ Auto: 6h</option>
                         <option value="720" {% if intervalo_auto == 720 %}selected{% endif %}>⏰ Auto: 12h</option>
-                        <option value="1440" {% if intervalo_auto == 1440 %}selected{% endif %}>⏰ Auto:24h</option>
+                        <option value="1440" {% if intervalo_auto == 1440 %}selected{% endif %}>⏰ Auto:1 dia</option>
+                        <option value="2880" {% if intervalo_auto == 2880 %}selected{% endif %}>⏰ Auto:2 dias</option>
                     </select>
                 </form>
                 <form action="/varrer" method="POST" style="display: flex; gap: 10px; align-items: center; margin: 0;">
+                    <button type="button" onclick="adicionarLink()" style="background: #1f1b2e; border: 1px solid #8257e5;">➕ Link Wishlist</button>
                     <button type="submit" name="modo" value="rapido" class="btn-verde">⚡ Varrer Wishlist</button>
                     {% if plataforma == 'Mercado Livre' %}
                         <button type="submit" name="modo" value="login_ml" style="background: #eab308; color:#000;">🔑 Login ML (1x)</button>
@@ -114,6 +118,8 @@
         <a href="/?plataforma=Mercado Livre" class="aba {% if plataforma == 'Mercado Livre' %}ativa{% endif %}">🤝 Mercado Livre</a>
         <a href="/?plataforma=Wishlist" class="aba {% if plataforma == 'Wishlist' %}ativa{% endif %}">⭐ Wishlist Geral</a>
         <a href="/?plataforma=Todas" class="aba {% if plataforma == 'Todas' %}ativa{% endif %}">🌐 Todas juntas</a>
+        <button type="button" class="aba" onclick="abrirLogs()" style="cursor: pointer;">📋 Logs de Varreduras</button>
+        <button type="button" class="aba" onclick="abrirTerminal()" style="cursor: pointer;">🖥️ Terminal Ao Vivo</button>
     </div>
 
     <form id="painel-filtros" class="filtros" method="GET" action="/">
@@ -205,6 +211,7 @@
                 <button type="button" class="btn-alvo {% if item.preco_alvo > 0 %}ativo{% endif %}" onclick="definirAlvo({{ item.id }}, {{ item.preco_alvo }}, this)" title="Definir Preço Alvo (R$)">
                     🎯{% if item.preco_alvo > 0 %} R$ {{ "%.0f"|format(item.preco_alvo) }}{% endif %}
                 </button>
+                <button type="button" class="btn-edit {% if item.titulo_editado %}ativo{% endif %}" onclick='editarTitulo({{ item.id }}, {{ item.nome|tojson }}, {{ item.nome_original|tojson }}, this)' title="Editar título desta oferta">✏️</button>
                     {% if item.desconto_pct > 0 %}
                     <span class="badge-desconto">-{{ item.desconto_pct }}%</span>
                 {% endif %}
@@ -254,6 +261,29 @@
                 </thead>
                 <tbody id="modal-tabela"></tbody>
             </table>
+        </div>
+    </div>
+    <div id="modal-logs" class="modal-fundo oculto" onclick="if(event.target===this) document.getElementById('modal-logs').classList.add('oculto')">
+        <div class="modal-caixa" style="max-width: 720px;">
+            <div class="modal-topo">
+                <h3 style="margin: 0; color: #c4b5fd; font-size: 16px;">📋 Histórico de Varreduras</h3>
+                <button type="button" onclick="document.getElementById('modal-logs').classList.add('oculto')" style="background: #2e2640; padding: 6px 12px;">✕</button>
+             </div>
+             <table class="tabela-hist">
+                <thead>
+                    <tr><th>#</th><th>Escopo / Modo</th><th>Início</th><th>Fim</th><th>Duração</th><th>Itens</th><th>Status</th></tr>
+                </thead>
+                <tbody id="tabela-logs-corpo"></tbody>
+             </table>
+        </div>
+    </div>
+    <div id ="modal-terminal" class="modal-fundo oculto" onclick="if(event.target===this) fecharTerminal()">
+        <div class="modal-caixa" style="max-width: 850px; background: #09090b; border-color: #04d361;">
+            <div class="modal-topo">
+                <h3 style="margin: 0; color: #04d361; font-size: 16px; font-family: monospace;">🖥️ Terminal do Servidor (journalctl -u radarpromo -f)></h3>
+                <button type="button" onclick="fecharTerminal()" style="background: #2e2640; padding: 6px 12px;">✕</button>
+            </div>
+            <pre id="caixa-terminal" style="background: #000; color: #04d361; font-family: monospace; font-size: 12px; padding: 15px; border-radius: 6px; height: 60vh; overflow-y: auto; white-space: pre-wrap; margin: 0; border: 1px solid #1f1b2e;">Carregando logs do servidor...</pre>
         </div>
     </div>
 
@@ -338,6 +368,83 @@
             const url = new URL(window.location.href);
             url.searchParams.set('pagina', numPagina);
             window.location.href = url.toString();
+        }
+
+        async function adicionarLink() {
+            const url = prompt("🔗 Cole o link do produto (Amazon, ML, Panini, JBC, NewPOP, Pipoca & Nanquim ou MPEG):");
+            if (!url) return;
+            const resp = await fetch('/adicionar_link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+            if (resp.ok) {
+                alert("✅ Link adicionado à Wishlist! Clique em '⚡ Varrer Wishlist' para buscar o preço e a capa.");
+            } else {
+                alert("❌ Link inválido.");
+            }
+        }
+
+        async function editarTitulo(id, nomeAtual, nomeOriginal, botao) {
+            const novo = prompt(`✏️ Editar título desta oferta:\n(Título original da loja: "${nomeOriginal}")\n\nDeixe em branco para restaurar o original:`, nomeAtual);
+            if (novo === null) return;
+            const resp = await fetch(`/editar_titulo/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ titulo: novo})
+            });
+            const dados = await resp.json();
+            if (dados.ok) {
+                botao.parentElement.querySelector('.titulo').innerText = dados.nome;
+                botao.classList.toggle('ativo', novo.trim() !== '');
+            }
+        }
+
+        async function abrirLogs() {
+            document.getElementById('modal-logs').classList.remove('oculto');
+            const resp = await fetch('/logs');
+            const logs = await resp.json();
+            const tbody = document.getElementById('tabela-logs-corpo');
+            tbody.innerHTML = logs.map(l => {
+                const min = Math.floor(l.duracao_seg / 60);
+                const seg = l.duracao_seg % 60;
+                const dur = min > 0 ? `${min}m ${seg}s` : `${seg}s`;
+                return `
+                    <tr>
+                        <td>#${l.id}</td>
+                        <td style="font-weight: bold; color: #f4f4f5;">${l.modo}</td>
+                        <td>${l.inicio_fmt}</td>
+                        <td>${l.fim_fmt}</td>
+                        <td>${dur}</td>
+                        <td>${l.total_lidos}</td>
+                        <td>${l.status}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        let timerTerminal = null;
+        async function atualizarTextoTerminal() {
+            const resp = await fetch('/terminal_vivo');
+            const dados = await resp.json();
+            const pre = document.getElementById('caixa-terminal');
+            const estavaNoFim = (pre.scrollHeight - pre.scrollTop - pre.clientHeight) < 60;
+            pre.innerText = dados.log;
+            if (estavaNoFim) pre.scrollTop = pre.scrollHeight;
+        }
+
+        function abrirTerminal() {
+            document.getElementById('modal-terminal').classList.remove('oculto');
+            atualizarTextoTerminal();
+            if (!timerTerminal) timerTerminal = setInterval(atualizarTextoTerminal, 2000);
+        }
+
+        function fecharTerminal() {
+            document.getElementById('modal-terminal').classList.add('oculto');
+            if (timerTerminal) {
+                clearInterval(timerTerminal);
+                timerTerminal = null;
+            }
         }
 
         {% if robo_rodando %}

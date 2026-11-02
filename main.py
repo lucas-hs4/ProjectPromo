@@ -6,7 +6,7 @@ from scraper import (
     extrair_amazon, extrair_vitrine_amazon,
     extrair_mercadolivre, extrair_vitrine_mercadolivre
 )
-from database import inicializar_banco, salvar_leitura, atualizar_status_alerta, conectar, listar_urls_favoritos
+from database import inicializar_banco, salvar_leitura, atualizar_status_alerta, conectar, listar_urls_favoritos, registrar_inicio_log, finalizar_log
 from notificador import enviar_alerta_ntfy
 import ctypes
 
@@ -166,6 +166,8 @@ def executar_robo(modo="completo"):
     inicializar_banco()
     conexao_db = conectar()
     
+    log_id = registrar_inicio_log(modo)
+    
     with sync_playwright() as p:
         if modo == "login_ml":
             nav_login = p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled"])
@@ -181,18 +183,18 @@ def executar_robo(modo="completo"):
             
         navegador = p.chromium.launch(
             headless=True,
-            args=["--disable-blink-features=AutomationControlled"]
+            args=["--headless=new", "--disable-blink-features=AutomationControlled"]
         )
         arquivo_sessao = "sessao_ml.json" if os.path.exists("sessao_ml.json") else None
         contexto = navegador.new_context(
             locale="pt-BR",
             viewport={"width": 1366, "height": 768},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64, x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
             storage_state=arquivo_sessao
         )
         
         pagina = contexto.new_page()
-        pagina.route("**/*", lambda route: route.abort() if route.request.resource_type in ["image", "media", "font"] else route.continue_())
+        pagina.route("**/*", lambda route: route.abort() if (route.request.resource_type in ["image", "media", "font"] and "mercadolivre" not in route.request.url) else route.continue_())
         
         urls_ja_varridas = set()
         
@@ -253,14 +255,14 @@ def executar_robo(modo="completo"):
                 for dados in lista_jbc:
                     processar_produto(dados, conexao_db)
                     
-        if modo in ("completo", "Amazon") and not scraper.cancelar_varredura:
+        if modo in ("completo", "Amazon", "Marketplaces") and not scraper.cancelar_varredura:
             for editora_nome, url_amz in BUSCAS_AMAZON:
                 if scraper.cancelar_varredura: break
                 lista_amz = extrair_vitrine_amazon(pagina, url_amz, editora_padrao=editora_nome, max_paginas=100, urls_vistas=urls_ja_varridas)
                 for dados in lista_amz:
                     processar_produto(dados, conexao_db)
                     
-        if modo in ("completo", "Mercado Livre") and not scraper.cancelar_varredura:
+        if modo in ("completo", "Mercado Livre", "Marketplaces") and not scraper.cancelar_varredura:
             for editora_nome, url_ml in BUSCAS_MERCADOLIVRE:
                 if scraper.cancelar_varredura: break
                 lista_ml = extrair_vitrine_mercadolivre(pagina, url_ml, editora_padrao=editora_nome, max_paginas=100, urls_vistas=urls_ja_varridas)
@@ -269,7 +271,12 @@ def executar_robo(modo="completo"):
         
         navegador.close()
         conexao_db.close()
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ Varredura concluída com sucesso!")
+        if scraper.cancelar_varredura:
+            finalizar_log(log_id, len(urls_ja_varridas), "⏹️ Interrompida")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] ⏹️ Varredura interrompida pelo usuário ({len(urls_ja_varridas)} itens lidos)!")
+        else:
+            finalizar_log(log_id, len(urls_ja_varridas), "✅ Concluída")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ Varredura concluída com sucesso ({len(urls_ja_varridas)} itens lidos)!")
     
     if hasattr(ctypes, "windll"):
         ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)

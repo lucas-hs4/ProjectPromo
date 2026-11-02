@@ -1,7 +1,12 @@
+import subprocess
 import time
 import threading
 from flask import Flask, render_template, request, redirect, url_for, jsonify
-from database import inicializar_banco, listar_ofertas, alternar_favorito, buscar_historico_produto, definir_preco_alvo
+from database import (
+    inicializar_banco, listar_ofertas, alternar_favorito,
+    buscar_historico_produto, definir_preco_alvo, conectar,
+    definir_titulo_editado, listar_logs, obter_intervalo_auto, salvar_intervalo_auto
+)
 from main import executar_robo
 
 app = Flask(__name__)
@@ -18,16 +23,33 @@ def rodar_robo_background(modo="completo"):
         
         
 def loop_agendador():
-    """Verifica a cada minuto se está na hora de disparar a varredura automática."""
+    """Gerencia os agendamentos automáticos em fila sem encavalar processos."""
     global robo_em_execucao
-    ultimo_disparo = time.time()
+    ult_wishlist = time.time()
+    ult_marketplace = time.time()
+    ult_editoras = time.time()
+    
     while True:
         time.sleep(30)
-        if intervalo_auto_min > 0 and not robo_em_execucao:
-            if (time.time() - ultimo_disparo) >= (intervalo_auto_min * 60):
-                robo_em_execucao = True
-                ultimo_disparo = time.time()
-                threading.Thread(target=rodar_robo_background, args=("rapido",), daemon=True).start()
+        if robo_em_execucao:
+            continue
+        
+        agora = time.time()
+        
+        if intervalo_auto_min > 0 and (agora - ult_wishlist) >= (intervalo_auto_min * 60):
+            robo_em_execucao = True
+            ult_wishlist = agora
+            threading.Thread(target=rodar_robo_background, args=("rapido",), daemon=True).start()
+            
+        elif intervalo_auto_min > 0 and (agora - ult_marketplace) >= 7200:
+            robo_em_execucao = True
+            ult_marketplace = agora
+            threading.Thread(target=rodar_robo_background, args=("Marketplaces",), daemon=True).start()
+            
+        elif intervalo_auto_min > 0 and (agora - ult_editoras) >= 172800:
+            robo_em_execucao = True
+            ult_editoras = agora
+            threading.Thread(target=rodar_robo_background, args=("Editoras",), daemon=True).start()
                 
 threading.Thread(target=loop_agendador, daemon=True).start()               
 
@@ -115,8 +137,54 @@ def salvar_meta(produto_id):
 def configurar_agendador():
     global intervalo_auto_min
     intervalo_auto_min = request.form.get("intervalo", default=0, type=int)
+    salvar_intervalo_auto(intervalo_auto_min)
     return redirect(request.referrer or url_for("index"))
+
+@app.route("/adicionar_link", methods=["POST"])
+def adicionar_link_wishlist():
+    dados = request.get_json() or {}
+    url = (dados.get("url") or "").strip()
+    if not url.startswith("http"):
+        return jsonify({"ok": False, "erro": "URL inválida"}), 400
+    
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("""
+        INSERT INTO produtos (nome, url, loja, plataforma, categoria, favorito)
+        VALUES ('⏳ Aguardando leitura...', %s, 'Outras', 'Editoras', 'Outros', TRUE)
+        ON CONFLICT (url) DO UPDATE SET favorito = TRUE
+        RETURNING id;
+    """, (url,))
+    
+    conexao.commit()
+    cursor.close()
+    conexao.close()
+    return jsonify({"ok": True})
+
+@app.route("/editar_titulo/<int:produto_id>", methods=["POST"])
+def editar_titulo(produto_id):
+    dados = request.get.json() or {}
+    novo_titulo = dados.get("titulo", "")
+    nome_final = definir_titulo_editado(produto_id, novo_titulo)
+    return jsonify({"ok": True, "nome": nome_final})
+
+@app.route("/logs")
+def ver_logs():
+    return jsonify(listar_logs())
+
+@app.route("/terminal_vivo")
+def terminal_vivo():
+    try:
+        saida = subprocess.check_output(
+            ["journalctl", "-u", "radarpromo", "-n", "120", "--no-pager", "-o", "cat"],
+            text=True,
+            stderr=subprocess.STDOUT
+        )
+        return jsonify({"ok": True, "log": saida})
+    except Exception as e:
+        return jsonify({"ok": False, "log": f"Erro ao ler journalctl: {e}"})
 
 if __name__ == "__main__":
     inicializar_banco()
+    intervalo_auto_min = obter_intervalo_auto()
     app.run(host="0.0.0.0", port=5000)

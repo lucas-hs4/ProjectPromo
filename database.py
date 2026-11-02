@@ -106,13 +106,40 @@ def inicializar_banco():
     
     cursor.execute("SELECT id, nome, loja FROM produtos WHERE plataforma = 'Amazon' AND loja LIKE 'Todas%';")
     
+        
+    cursor.execute("SELECT id, nome, url, loja, plataforma FROM produtos;")
     from scraper import identificar_editora
-    for pid, pnome, ploja in cursor.fetchall():
-        nova_ed = identificar_editora(pnome, ploja)
-        nova_cat = identificar_categoria(pnome, nova_ed.lower(), 10.0)
-        cursor.execute("UPDATE produtos SET loja = %s, categoria = %s WHERE id = %s;", (nova_ed, nova_cat, pid))
+    for pid, pnome, purl, ploja, pplataforma in cursor.fetchall():
+        nova_ed = identificar_editora(pnome, ploja) if pplataforma != "Editoras" else ploja
+        contexto_cat = purl if pplataforma == "Editoras" else nova_ed.lower()
+        nova_cat = identificar_categoria(pnome, contexto_cat, 10.0)
+        if nova_ed != ploja or nova_cat != "":
+            cursor.execute("UPDATE produtos SET loja = %s, categoria = %s WHERE id = %s;", (nova_ed, nova_cat, pid))
         
     cursor.execute("DELETE FROM historico_precos WHERE preco_atual <= 0;")
+    
+    cursor.execute("""
+        ALTER TABLE produtos
+        ADD COLUMN IF NOT EXISTS titulo_editado TEXT;
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS logs_varredura (
+            id SERIAL PRIMARY KEY,
+            modo VARCHAR(50) NOT NULL,
+            inicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            fim TIMESTAMP,
+            total_lidos INTEGER DEFAULT 0,
+            status VARCHAR(50) DEFAULT 'Em andamento'
+        );
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS configuracoes (
+            chave VARCHAR(50) PRIMARY KEY,
+            valor INTEGER DEFAULT 0
+        );
+    """)
     
     conexao.commit()
     cursor.close()
@@ -151,7 +178,7 @@ def salvar_leitura(dados, conexao=None):
                 THEN produtos.categoria
                 ELSE EXCLUDED.categoria
             END
-        RETURNING id, (alerta_enviado AND ultimo_alerta IS NOT NULL AND ultimo_alerta > NOW() - INTERVAL '3 days'), favorito, COALESCE(preco_alvo, 0.0);
+        RETURNING id, (alerta_enviado AND ultimo_alerta IS NOT NULL AND ultimo_alerta > NOW() - INTERVAL '3 days'), favorito, COALESCE(preco_alvo, 0.0), titulo_editado;
     """
     cursor.execute(sql_produto, (dados["nome"], dados["url"], loja, plataforma, imagem_url, categoria))
     
@@ -160,6 +187,8 @@ def salvar_leitura(dados, conexao=None):
     alerta_ja_enviado = resultado_produto[1]
     eh_favorito = resultado_produto[2]
     preco_alvo = float(resultado_produto[3])
+    if resultado_produto[4]:
+        dados["nome"] = resultado_produto[4]
     
     cursor.execute("""
         SELECT preco_atual, disponivel, status_estoque
@@ -237,11 +266,11 @@ def listar_ofertas(desconto_min=0, preco_min=0.0, preco_max=0.0, busca="", loja=
     sql = """
         SELECT COUNT(*) OVER() AS total_geral, * FROM (
             SELECT DISTINCT ON (p.id)
-                p.id, p.nome, p.url, p.loja, p.plataforma, p.imagem_url, p.categoria, p.favorito,
+                p.id, COALESCE(NULLIF(p.titulo_editado, ''), p.nome) AS nome, p.nome AS nome_original, COALESCE(p.titulo_editado, '') AS titulo_editado, p.url, p.loja, p.plataforma, p.imagem_url, p.categoria, p.favorito,
                 COALESCE(p.preco_alvo, 0.0) AS preco_alvo,
                 h.preco_original, h.preco_atual, h.desconto_pct,
                 h.status_estoque, h.disponivel, h.data_consulta,
-                MIN(h.preco_atual) OVER (PARTITION BY p.id) AS menor_preco
+                COALESCE(MIN(h.preco_atual) FILTER (WHERE h.preco_atual > 0) OVER (PARTITION BY p.id), h.preco_atual) AS menor_preco
             FROM produtos p
             JOIN historico_precos h ON p.id = h.produto_id
             ORDER BY p.id, h.data_consulta DESC
@@ -360,6 +389,83 @@ def definir_preco_alvo(produto_id, valor_alvo):
             favorito = CASE WHEN %s > 0 THEN TRUE ELSE favorito END
         WHERE id = %s;
     """, (valor_alvo, valor_alvo, produto_id))
+    conexao.commit()
+    cursor.close()
+    conexao.close()
+    
+def definir_titulo_editado(produto_id, novo_titulo):
+    """Salva um título personalizado para a oferta (ou limpa se vier vazio)."""
+    conexao = conectar()
+    cursor = conexao.cursor()
+    titulo_limpo = novo_titulo.strip() if novo_titulo else None
+    cursor.execute("""
+        UPDATE produtos
+        SET titulo_editado = %s
+        WHERE id = %s
+        RETURNING COALESCE(NULLIF(titulo_editado, ''), nome);
+    """, (titulo_limpo, produto_id))
+    nome_final = cursor.fetchone()[0]
+    conexao.commit()
+    cursor.close()
+    conexao.close()
+    return nome_final
+
+def registrar_inicio_log(modo):
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("INSERT INTO logs_varredura (modo, status) VALUES (%s, '🔄 Em andamento') RETURNING id;", (modo,))
+    log_id = cursor.fetchone()[0]
+    conexao.commit()
+    cursor.close()
+    conexao.close()
+    return log_id
+
+def finalizar_log(log_id, total_lidos, status):
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("""
+        UPDATE logs_varredura
+        SET fim = CURRENT_TIMESTAMP, total_lidos = %s, status = %s
+        WHERE id = %s;
+    """, (total_lidos, status, log_id))
+    conexao.commit()
+    cursor.close()
+    conexao.close()
+    
+def listar_logs(limite=50):
+    conexao = conectar()
+    cursor = conexao.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("""
+        SELECT
+             id, modo, total_lidos, status,
+             TO_CHAR(inicio, 'DD/MM/YYYY HH24:MI:SS') AS inicio_fmt,
+             COALESCE(TO_CHAR(fim, 'HH24:MI:SS'), '--:--:--') AS fim_fmt,
+             COALESCE(EXTRACT(EPOCH FROM (COALESCE(fim, CURRENT_TIMESTAMP) - inicio))::INTEGER, 0) AS duracao_seg
+        FROM logs_varredura
+        ORDER BY id DESC
+        LIMIT %s;
+    """, (limite,))
+    logs = cursor.fetchall()
+    cursor.close()
+    conexao.close()
+    return logs
+
+def obter_intervalo_auto():
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("SELECT valor FROM configuracoes WHERE chave = 'intervalo_auto';")
+    linha = cursor.fetchone()
+    cursor.close()
+    conexao.close()
+    return linha[0] if linha else 0
+
+def salvar_intervalo_auto(minutos):
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("""
+        INSERT INTO configuracoes (chave, valor) VALUES ('intervalo_auto', %s)
+        ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor;
+    """, (minutos,))
     conexao.commit()
     cursor.close()
     conexao.close()
