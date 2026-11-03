@@ -223,7 +223,7 @@ def identificar_categoria(nome, url_contexto="", preco_atual=10.0):
     
     if "tartarugas ninja" in texto or "ultimo ronin" in texto or "último ronin" in texto:
         return "As Tartarugas Ninja"
-    if "/disney" in texto or "disney" in texto or any(d in texto for d in ["mickey", "pato donald", "donald", "ducktales", "duck tales", "mickey e pateta", "tio patinhas", "minnie", "pateta", "19.999 léguas submarinas", "Histórias de Esportes"]):
+    if "/disney" in texto or "disney" in texto or any(d in texto for d in ["mickey", "pato donald", "donald", "ducktales", "duck tales", "mickey e pateta", "tio patinhas", "minnie", "pateta", "19.999 léguas submarinas", "histórias de esportes"]):
         return "Disney"
     if "/invencivel" in texto or "invencível" in texto or "invencivel" in texto:
         return "Invencível"
@@ -239,7 +239,7 @@ def identificar_categoria(nome, url_contexto="", preco_atual=10.0):
         return "Novels & Livros"
     elif "/marvel" in texto or any(h in texto for h in ["marvel", "homem-aranha","homem de ferro", "viúva negra", "viuva negra", "viúva-negra", "aranha", "vingadores", "x-men", "wolverine", "demolidor", "thor", "capitão américa", "capitao américa", "hulk", "deadpool", "quarteto fantástico", "surfista prateado", "venom", "doutor estranho"]):
         return "Marvel"
-    elif "/dc-comics" in texto or "dc+comics" in texto or any(h in texto for h in ["dc", "batman", "superman", "mulher-maravilha", "liga da justiça", "flash", "lanterna verde", "asa noturna", "coringa", "sandman", "arlequina", "watchmen", "juízo final", "heróis em crise", "herois em crise", "robin", "shazam", "A Saga Dos Superfilhos", "Gordon: Lei & Ordem", "esquadrão suicida"]):
+    elif "/dc-comics" in texto or "dc+comics" in texto or any(h in texto for h in ["dc", "batman", "superman", "mulher-maravilha", "liga da justiça", "flash", "lanterna verde", "asa noturna", "coringa", "sandman", "arlequina", "watchmen", "juízo final", "heróis em crise", "herois em crise", "robin", "shazam", "a saga dos superfilhos", "gordon: lei & ordem", "esquadrão suicida"]):
         return "DC Comics"
     elif "/planet-manga" in texto or "planet+manga" in texto or "lojanewpop" in texto or "mpeg.com.br" in texto or "mangas.html" in texto or any(m in texto for m in ["junji ito", "shigurui", "city hunter", "cat's eye", "cats eye", "chushingura", "battle royale", "one piece", "berserk", "naruto", "dragon ball", "demon slayer", "jujutsu", "tokyo ghoul", "chainsaw man", "mashle", "re:zero", "katana beast", "record of ragnarok", "one punch man", "hokuto no ken", "the ghost in the shell", "devil exstasy", "zero no tsukaima", "aku no hana", "ragna crimson", "tower of god"]):
         return "Mangás"
@@ -662,73 +662,107 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
         print(f"\n[Amazon • {editora_padrao}] Varrendo Página {pagina_num}: {url_atual}...")
         
         try:
-            resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000)
-            if resposta.status == 503:
-                print("   [Pausa Anti-503] Amazon pediu fôlego. Aguardando 20s e tentando novamente...")
-                pagina.wait_for_timeout(20000)
+            resposta = None
+            for tentativa_503 in range(3):
                 resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000)
-            if resposta.status != 200:
-                print(f"Erro ao acessar Amazon. Status {resposta.status}")
+                if resposta.status == 503:
+                    print(f"   [Pausa Anti-503] Amazon pediu fôlego (tentativa {tentativa_503 + 1}/3). Aguardando 20s...")
+                    pagina.wait_for_timeout(20000)
+                else:
+                    break
+            if not resposta or resposta.status != 200:
+                print(f"   [Fim do Link] Erro aoa acessar Amazon na Página {pagina_num}. Status: {resposta.status if resposta else 'Sem resposta'}")
                 break
-            pagina.wait_for_selector('div[data-component-type="s-search-result"]', timeout=20000)
+            pagina.wait_for_selector('div[data-component-type="s-search-result"]', timeout=25000)
+            pagina.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             pagina.wait_for_timeout(2000)
         except Exception as erro:
-            print(f"   [Aviso] Pulo na Página {pagina_num} da Amazon: {erro}")
+            print(f"   [Fim do Link] Página {pagina_num} não carregou cards (possível Captcha ou fim dos resultados): {erro}")
             break
         
         cards = pagina.locator('div[data-component-type="s-search-result"]')
-        lista_bruta = cards.evaluate_all("""els => els.map(el => {
-            const texto = el.innerText || '';
-            const textoLower = texto.toLowerCase();
-            
+        resultado_pag = cards.evaluate_all("""els => {
+            let stats = { total: els.length, validos: 0, importados: 0, so_kindle: 0, sem_preco: 0};
+            let itens = [];
             const bloqueados = [
                 'edição inglês', 'edição espanhol', 'edição italiano', 'edição francês',
                 'edição alemão', 'edição japonês', 'english edition', 'italian edition',
                 'spanish edition', 'compra internacional', 'importado'
             ];
-            if (bloqueados.some(b => textoLower.includes(b))) return null;
+            const formatosFisicos = [
+                'capa comum', 'capa dura', 'brochura', 'livro cartonado',
+                'livro de bolso', 'capa flexível', 'espiral', 'box'
+            ];
             
-            const h2 = el.querySelector('h2');
-            const img = el.querySelector('img.s-image');
-            
-            const nos = Array.from(el.querySelectorAll('a, span.a-price'));
-            let formatoAtual = '';
-            let linkFisico = null;
-            let precoTxt = '';
-            let antigoTxt = '';
-            
-            for (const no of nos) {
-                if (no.tagName === 'A') {
-                    const txtFormato = no.innerText.trim().toLowerCase();
-                    if (['capa comum', 'capa dura', 'brochura', 'livro cartonado'].includes(txtFormato) && !no.href.toLowerCase().includes('-ebook/')) {
-                        formatoAtual = 'fisico';
-                        if (!linkFisico) linkFisico = no;
-                    } else if (txtFormato.includes('kindle') || txtFormato.includes('audiolivro') || txtFormato.includes('áudio') || no.href.toLowerCase().includes('-ebook/')) {
-                        formatoAtual = 'digital';
-                    }
-                } else if (no.tagName === 'SPAN' && formatoAtual === 'fisico') {
-                    const off = no.querySelector('.a-offscreen');
-                    if (!off) continue;
-                    if (no.getAttribute('data-a-strike') === 'true') {
-                        if (!antigoTxt) antigoTxt = off.textContent;
-                    } else {
-                        if (!precoTxt) precoTxt = off.textContent;
+            for (const el of els) {
+                const h2 = el.querySelector('h2');
+                const nome = h2 ? h2.innerText.trim() : '';
+                if (!nome) continue;
+                
+                const cabecalhoTxt = (nome + ' ' + (el.querySelector('.a-row.a-size-base.a-color-secondary')?.innerText || '')).toLowerCase();
+                if (bloqueados.some(b => cabecalhoTxt.includes(b))) {
+                    stats.importados++;
+                    continue;
+                }
+                
+                const img = el.querySelector('img.s-image');
+                const links = Array.from(el.querySelectorAll('a'));
+                let linkFisico = null;
+                let precoTxt = '';
+                let antigoTxt = '';
+                
+                for (const a of links) {
+                    const txt = a.innerText.trim().toLowerCase();
+                    if (formatosFisicos.includes(txt) && !a.href.toLowerCase().includes('-ebook/')) {
+                        linkFisico = a;
+                        let container = a.closest('.a-row, .puis-price-instructions-style, .a-section') || el;
+                        const spansPreco = Array.from(container.querySelectorAll('span.a-price'));
+                        for (const sp of spansPreco) {
+                            const off = sp.querySelector('.a-offscreen');
+                            if (!off) continue;
+                            if (sp.getAttribute('data-a-strike') === 'true'){
+                                if (!antigoTxt) antigoTxt = off.textContent;
+                            } else {
+                                if (!precoTxt) precoTxt = off.textContent;
+                            }
+                        }
+                        if (precoTxt) break;
                     }
                 }
+                if (linkFisico && !precoTxt) {
+                    const textoCard = el.innerText || '';
+                    const matchPreco = textoCard.match(/R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})/);
+                    if (matchPreco) precoTxt = matchPreco[0];
+                }
+                
+                if (!linkFisico) {
+                    stats.so_kindle++;
+                    continue;
+                }
+                if (!precoTxt) {
+                    stats.sem_preco++;
+                    continue;
+                }
+                
+                stats.validos++;
+                const texto = el.innerText || '';
+                itens.push({
+                    nome: nome,
+                    url: linkFisico.href.split('/ref=')[0].split('?')[0],
+                    img: img ? img.src : '',
+                    preco_txt: precoTxt,
+                    antigo_txt: antigoTxt,
+                    prevenda: texto.includes('Pré-venda') || texto.includes('Será lançado')
+                });
             }
-            if (!linkFisico || !precoTxt) return null;
+        return { stats, itens };
+        }""")
             
-            return {
-                nome: h2 ? h2.innerText.trim() : '',
-                url: linkFisico.href.split('/ref=')[0].split('?')[0],
-                img: img ? img.src : '',
-                preco_txt: precoTxt,
-                antigo_txt: antigoTxt,
-                prevenda: texto.includes('Pré-venda') || texto.includes('Será lançado')
-            };
-        }).filter(Boolean)""")
-        print(f"Encontrados {len(lista_bruta)} itens nesta página da Amazon.")
+        st = resultado_pag["stats"]
+        lista_bruta = resultado_pag["itens"]
+        print(f"   [Raio-X Pág {pagina_num}] {st['total']} cards na tela -> {st['validos']} físicos válidos | Ignorados: {st['importados']} Importados, {['so_kindle']} Só Kindle, {['sem_preco']} Esgotados/Sem preço.")
         
+        novos_na_pag = 0
         for item in lista_bruta:
             if not item["url"] or not item["nome"] or item["url"] in urls_vistas:
                 continue
@@ -759,6 +793,10 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
                 "status": status_estoque,
                 "disponivel": True
             })
+            novos_na_pag += 1
+        
+        if st["validos"] > novos_na_pag:
+            print(f"   [Info] Dos {st['validos']} válidos, {st['validos'] - novos_na_pag} já tinham sido lidos em páginas/buscas anteriores.")
         
         botao_prox = pagina.locator("a.s-pagination-next:not(.s-pagination-disabled)").first
         if botao_prox.count() > 0 and pagina_num < max_paginas:
@@ -769,6 +807,8 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
                 url_atual += f"&i=stripbooks&{rh_original}"
             pagina_num += 1
         else:
+            motivo = "Limite de páginas atingido" if pagina_num >= max_paginas else "Última página da ctegoria atingida (botão Próximo desativado)"
+            print(f"   [Fim do Link] Paginação encerrada na Página: {pagina_num}: {motivo}.")
             url_atual = None
         
     return produtos_extraidos

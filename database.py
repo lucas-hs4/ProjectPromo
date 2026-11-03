@@ -104,16 +104,15 @@ def inicializar_banco():
             );
     """)
     
-    cursor.execute("SELECT id, nome, loja FROM produtos WHERE plataforma = 'Amazon' AND loja LIKE 'Todas%';")
+    #cursor.execute("SELECT id, nome, loja FROM produtos WHERE plataforma = 'Amazon' AND loja LIKE 'Todas%';")
     
-        
-    cursor.execute("SELECT id, nome, url, loja, plataforma FROM produtos;")
+    cursor.execute("SELECT id, nome, url, loja, plataforma, categoria FROM produtos;")
     from scraper import identificar_editora
-    for pid, pnome, purl, ploja, pplataforma in cursor.fetchall():
+    for pid, pnome, purl, ploja, pplataforma, pcat in cursor.fetchall():
         nova_ed = identificar_editora(pnome, ploja) if pplataforma != "Editoras" else ploja
         contexto_cat = purl if pplataforma == "Editoras" else nova_ed.lower()
         nova_cat = identificar_categoria(pnome, contexto_cat, 10.0)
-        if nova_ed != ploja or nova_cat != "":
+        if nova_ed != ploja or nova_cat != pcat:
             cursor.execute("UPDATE produtos SET loja = %s, categoria = %s WHERE id = %s;", (nova_ed, nova_cat, pid))
         
     cursor.execute("DELETE FROM historico_precos WHERE preco_atual <= 0;")

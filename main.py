@@ -163,7 +163,6 @@ def executar_robo(modo="completo"):
     if hasattr(ctypes, "windll"):
         ctypes.windll.kernel32.SetThreadExecutionState(0x80000001)
     scraper.cancelar_varredura = False
-    inicializar_banco()
     conexao_db = conectar()
     
     log_id = registrar_inicio_log(modo)
