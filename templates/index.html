@@ -65,25 +65,18 @@
             <h2>Radar de promoções ({{ total_itens }} itens)</h2>
         </div>
         <div id="painel-botoes">
-        {% if robo_rodando %}
-            <form action="/parar" method="POST" style="display: flex; gap: 10px; align-items: center;">
-                <span>Varrendo lojas em 2° plano...</span>
-                <button type="submit" style="background: #e53935;">🛑 Parar Varredura</button>
-            </form>
-        {% else %}
-            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <form action="/agendar" method="POST" style="margin: 0;">
-                    <select name="intervalo" onchange="this.form.submit()" title="Agendador Automático de Wishlist">
-                        <option value="0" {% if intervalo_auto == 0 %}selected{% endif %}>⏰ Auto: Off</option>
-                        <option value="30" {% if intervalo_auto == 30 %}selected{% endif %}>⏰ Auto: 30 min</option>
-                        <option value="60" {% if intervalo_auto == 60 %}selected{% endif %}>⏰ Auto: 1h</option>
-                        <option value="180" {% if intervalo_auto == 180 %}selected{% endif %}>⏰ Auto: 3h</option>
-                        <option value="360" {% if intervalo_auto == 360 %}selected{% endif %}>⏰ Auto: 6h</option>
-                        <option value="720" {% if intervalo_auto == 720 %}selected{% endif %}>⏰ Auto: 12h</option>
-                        <option value="1440" {% if intervalo_auto == 1440 %}selected{% endif %}>⏰ Auto:1 dia</option>
-                        <option value="2880" {% if intervalo_auto == 2880 %}selected{% endif %}>⏰ Auto:2 dias</option>
-                    </select>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            {% if robo_rodando %}
+                <form action="/parar" method="POST" style="margin: 0;">
+                    <button type="submit" style="background: #e53935;">🛑 Parar Atual</button>
                 </form>
+            {% endif %}
+            <form action="/agendar" method="POST" style="margin: 0;">
+                <select name="intervalo" onchange="this.form.submit()" title="Liga/Desliga as varreduras automáticas (Marketplaces 3h / Editoras 3 dias)">
+                    <option value="0" {% if intervalo_auto == 0 %}selected{% endif %}>⏰ Auto: OFF (Pausado)</option>
+                    <option value="1" {% if intervalo_auto > 0 %}selected{% endif %}>⏰ Auto: ON (Mkt 3h | Ed 3d)</option>
+                </select>
+            </form>
                 <form action="/varrer" method="POST" style="display: flex; gap: 10px; align-items: center; margin: 0;">
                     <button type="button" onclick="adicionarLink()" style="background: #1f1b2e; border: 1px solid #8257e5;">➕ Link Wishlist</button>
                     <button type="submit" name="modo" value="rapido" class="btn-verde">⚡ Varrer Wishlist</button>
@@ -107,8 +100,7 @@
                     {% endif %}
                     <button type="submit" name="modo" value="completo" style="background: #2e2640;">🌐 Varrer tudo</button>
                 </form>
-            </div>
-        {% endif %}
+        </div>
         </div>
     </div>
 
@@ -246,6 +238,7 @@
     </div>
     {% endif %}
     <div style="display: flex; justify-content: center; gap: 15px; margin: 40px 0 20px 0; padding-top: 20px; border-top: 1px solid #2e2640;">
+        <button type="button" class="aba" onclick="abrirFila()" style="cursor: pointer;">⏳ Fila & Agendador</button>
         <button type="button" class="aba" onclick="abrirLogs()" style="cursor: pointer;">📋 Logs de Varreduras</button>
         <button type="button" class="aba" onclick="abrirTerminal()" style="cursor: pointer;">🖥️ Terminal Ao Vivo</button>
     </div>
@@ -286,6 +279,15 @@
                 <button type="button" onclick="fecharTerminal()" style="background: #2e2640; padding: 6px 12px;">✕</button>
             </div>
             <pre id="caixa-terminal" style="background: #000; color: #04d361; font-family: monospace; font-size: 12px; padding: 15px; border-radius: 6px; height: 60vh; overflow-y: auto; white-space: pre-wrap; margin: 0; border: 1px solid #1f1b2e;">Carregando logs do servidor...</pre>
+        </div>
+    </div>
+    <div id="modal-fila" class="modal-fundo oculto" onclick="if(event.target===this) document.getElementById('modal-fila').classList.add('oculto')">
+        <div class="modal-caixa" style="max-width: 600px;">
+            <div class="modal-topo">
+                <h3 style="margin: 0; color: #c4b5fd; font-size: 16px;">⏳ Fila de Espera & Próximas Varreduras</h3>
+                <button type="button" onclick="document.getElementById('modal-fila').classList.add('oculto')" style="background: #2e2640; padding: 6px 12px;">✕</button>
+            </div>
+            <div id="conteudo-fila" style="font-size: 14px; line-height:  1.6;"></div>
         </div>
     </div>
 
@@ -447,6 +449,48 @@
                 clearInterval(timerTerminal);
                 timerTerminal = null;
             }
+        }
+
+        function formatarTempo(seg) {
+            if (seg < 0) return '<span style="color: #8d8d99;">Pausado (Auto OFF)</span>';
+            if (seg === 0) return '<span style="color: #04d361;">Na fila / Agora</span>';
+            const d = Math.floor(seg / 86400);
+            const h = Math.floor((seg % 86400) / 3600);
+            const m = Math.floor((seg % 3600) / 60);
+            return (d > 0 ? `${d}d ` : '') + (h > 0 ? `${h}h ` : '') + `${m}min`;
+        }
+
+        async function abrirFila() {
+            document.getElementById('modal-fila').classList.remove('oculto');
+            const resp = await fetch('/fila');
+            const d = await resp.json();
+            const filaHtml = d.fila.length > 0
+                ? `<ol style="margin: 8px 0; padding-left: 20px; color: #facc15; font-weight: bold;">${d.fila.map(item => `<li>${item}</li>`).join('')}</ol>
+                <button type="button" onclick="limparFila()" style="background: #e53935; padding: 6px 12px; font-size: 12px; margin-top: 5px;">🗑️ Limpar Fila de Espera</button>`
+                : '<p style="color: #a1a1aa; margin: 5px 0;">Nenhuma varredura aguardando na fila.</p>';
+
+            const agHtml = d.agendamentos.map(a => `
+                <tr>
+                    <td style="font-weight: bold;">${a.rotulo}</td>
+                    <td>${formatarTempo(a.restante_seg)}</td>
+                </tr>
+            `).join('');
+                document.getElementById('conteudo-fila').innerHTML = `
+                <div style="background: #1f1b2e; padding: 12px 15px; border-radius: 8px; border: 1px solid #4c3d6e; margin-bottom: 15px;">
+                    <div><strong>🔄 Executando agora:</strong> <span style="color: #04d361; font-weight: bold;">${d.modo_atual}</span></div>
+                    <div style="margin-top: 10px;"><strong>⏳ Próximas na Fila de Espera:</strong>${filaHtml}</div>
+                </div>
+                <h4 style="margin: 15px 0 5px 0; color: #a78bfa;">⏰ Contagem Regressiva do Automático:</h4>
+                <table class="tabela-hist">
+                    <thead><tr><th>Escopo Automático</th><th>Próximo Disparo em</th></tr></thead>
+                    <tbody>${agHtml}</tbody>
+                </table>
+            `;
+        }
+
+        async function limparFila() {
+            await fetch('/limpar_fila', { method: 'POST' });
+            abrirFila();
         }
 
         {% if robo_rodando %}

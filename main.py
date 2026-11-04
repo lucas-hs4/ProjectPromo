@@ -163,34 +163,42 @@ def executar_robo(modo="completo"):
     if hasattr(ctypes, "windll"):
         ctypes.windll.kernel32.SetThreadExecutionState(0x80000001)
     scraper.cancelar_varredura = False
-    conexao_db = conectar()
     
-    log_id = registrar_inicio_log(modo)
+    ua_padrao = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    arquivo_sessao = "sessao_ml.json" if os.path.exists("sessao_ml.json") else None
     
     with sync_playwright() as p:
         if modo == "login_ml":
             nav_login = p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled"])
-            ctx_login = nav_login.new_context(locale="pt-BR", viewport={"width": 1366, "height":768})
+            ctx_login = nav_login.new_context(
+                locale="pt-BR", 
+                viewport={"width": 1366, "height":768},
+                user_agent=ua_padrao,
+                storage_state=arquivo_sessao
+            )
+            ctx_login.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
             pag_login = ctx_login.new_page()
-            pag_login.goto("https://www.mercadolivre.com.br/gz/account-verification")
+            pag_login.goto("https://www.mercadolivre.com.br/livros-revistas-comics/hqs-mangas/novo/panini")
             pag_login.wait_for_timeout(60000)
             ctx_login.storage_state(path="sessao_ml.json")
             nav_login.close()
-            conexao_db.close()
             print("[Login ML] ✅ Sessão salva em 'sessao_ml.json' com sucesso!")
             return
+        
+        conexao_db = conectar()
+        log_id = registrar_inicio_log(modo)
             
         navegador = p.chromium.launch(
             headless=True,
             args=["--headless=new", "--disable-blink-features=AutomationControlled"]
         )
-        arquivo_sessao = "sessao_ml.json" if os.path.exists("sessao_ml.json") else None
         contexto = navegador.new_context(
             locale="pt-BR",
             viewport={"width": 1366, "height": 768},
-            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            user_agent=ua_padrao,
             storage_state=arquivo_sessao
         )
+        contexto.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined}); Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});")
         
         pagina = contexto.new_page()
         pagina.route("**/*", lambda route: route.abort() if (route.request.resource_type in ["image", "media", "font"] and "mercadolivre" not in route.request.url) else route.continue_())

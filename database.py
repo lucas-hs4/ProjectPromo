@@ -449,22 +449,22 @@ def listar_logs(limite=50):
     conexao.close()
     return logs
 
-def obter_intervalo_auto():
+def obter_config(chave, padrao=0):
     conexao = conectar()
     cursor = conexao.cursor()
-    cursor.execute("SELECT valor FROM configuracoes WHERE chave = 'intervalo_auto';")
+    cursor.execute("SELECT valor FROM configuracoes WHERE chave = %s;", (chave,))
     linha = cursor.fetchone()
     cursor.close()
     conexao.close()
     return linha[0] if linha else 0
 
-def salvar_intervalo_auto(minutos):
+def salvar_config(chave, valor):
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("""
-        INSERT INTO configuracoes (chave, valor) VALUES ('intervalo_auto', %s)
+        INSERT INTO configuracoes (chave, valor) VALUES (%s, %s)
         ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor;
-    """, (minutos,))
+    """, (chave, int(valor)))
     conexao.commit()
     cursor.close()
     conexao.close()

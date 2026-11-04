@@ -5,51 +5,65 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 from database import (
     inicializar_banco, listar_ofertas, alternar_favorito,
     buscar_historico_produto, definir_preco_alvo, conectar,
-    definir_titulo_editado, listar_logs, obter_intervalo_auto, salvar_intervalo_auto
+    definir_titulo_editado, listar_logs, obter_config, salvar_config
 )
 from main import executar_robo
 
 app = Flask(__name__)
 
 robo_em_execucao = False
+modo_atual = None
+fila_varreduras = []
 intervalo_auto_min = 0
 
-def rodar_robo_background(modo="completo"):
+REGRAS_AUTO = [
+    ("rapido", "ult_wishlist", 3 * 3600, " Wishlist (3h)"),
+    ("Amazon", "ult_amazon", 3 * 3600, " Amazon (3h)"),
+    ("Mercado Livre", "ult_ml", 3 * 3600, " Mercado Livre (3h)"),
+    ("Editoras", "ult_editoras", 72 * 3600, " Editoras (3 dias)")
+]
+
+def enfileirar_ou_rodar(modo):
+    """Inicia a varredura imediatamente se estiver livre, ou coloca na fila de espera."""
     global robo_em_execucao
+    if not robo_em_execucao:
+        robo_em_execucao = True
+        threading.Thread(target=rodar_robo_background, args=(modo,), daemon=True).start()
+    elif modo != modo_atual and modo not in fila_varreduras:
+        fila_varreduras.append(modo)
+
+def rodar_robo_background(modo="completo"):
+    global robo_em_execucao, modo_atual
+    modo_atual = modo
     try:
+        agora = int(time.time())
+        for m_regra, chave_db, _, _ in REGRAS_AUTO:
+            if modo == m_regra or (modo == "completo" and m_regra != "rapido"):
+                salvar_config(chave_db, agora)
         executar_robo(modo)
     finally:
-        robo_em_execucao = False
+        if fila_varreduras:
+            proximo = fila_varreduras.pop(0)
+            threading.Thread(target=rodar_robo_background, args=(proximo,), daemon=True).start()
+        else:
+            modo_atual = None
+            robo_em_execucao = False
         
         
 def loop_agendador():
-    """Gerencia os agendamentos automáticos em fila sem encavalar processos."""
-    global robo_em_execucao
-    ult_wishlist = time.time()
-    ult_marketplace = time.time()
-    ult_editoras = time.time()
-    
+    """Verifica a cada 30s se alguma aba atingiu seu horário (3h Marketplaces / 3d Editoras)."""
     while True:
         time.sleep(30)
-        if robo_em_execucao:
+        if intervalo_auto_min <= 0:
             continue
-        
-        agora = time.time()
-        
-        if intervalo_auto_min > 0 and (agora - ult_wishlist) >= (intervalo_auto_min * 60):
-            robo_em_execucao = True
-            ult_wishlist = agora
-            threading.Thread(target=rodar_robo_background, args=("rapido",), daemon=True).start()
-            
-        elif intervalo_auto_min > 0 and (agora - ult_marketplace) >= 7200:
-            robo_em_execucao = True
-            ult_marketplace = agora
-            threading.Thread(target=rodar_robo_background, args=("Marketplaces",), daemon=True).start()
-            
-        elif intervalo_auto_min > 0 and (agora - ult_editoras) >= 172800:
-            robo_em_execucao = True
-            ult_editoras = agora
-            threading.Thread(target=rodar_robo_background, args=("Editoras",), daemon=True).start()
+        agora = int(time.time())
+        for modo_regra, chave_db, intervalo_seg, _ in REGRAS_AUTO:
+            ult = obter_config(chave_db, 0)
+            if ult == 0:
+                salvar_config(chave_db, agora)
+            elif (agora - ult) >= intervalo_seg:
+                salvar_config(chave_db, agora)
+                enfileirar_ou_rodar(modo_regra)
                 
 threading.Thread(target=loop_agendador, daemon=True).start()               
 
@@ -98,12 +112,8 @@ def index():
     
 @app.route("/varrer", methods=["POST"])
 def acionar_varredura():
-    global robo_em_execucao
     modo = request.form.get("modo", "completo")
-    if not robo_em_execucao:
-        robo_em_execucao = True
-        thread = threading.Thread(target=rodar_robo_background, args=(modo,))
-        thread.start()
+    enfileirar_ou_rodar(modo)
     return redirect(request.referrer or url_for("index"))
 
 @app.route("/parar", methods=["POST"])
@@ -137,7 +147,12 @@ def salvar_meta(produto_id):
 def configurar_agendador():
     global intervalo_auto_min
     intervalo_auto_min = request.form.get("intervalo", default=0, type=int)
-    salvar_intervalo_auto(intervalo_auto_min)
+    salvar_config("intervalo_auto", intervalo_auto_min)
+    if intervalo_auto_min > 0:
+        agora = int(time.time())
+        for _, chave_db, _, _ in REGRAS_AUTO:
+            if obter_config(chave_db, 0) == 0:
+                salvar_config(chave_db, agora)
     return redirect(request.referrer or url_for("index"))
 
 @app.route("/adicionar_link", methods=["POST"])
@@ -183,8 +198,29 @@ def terminal_vivo():
         return jsonify({"ok": True, "log": saida})
     except Exception as e:
         return jsonify({"ok": False, "log": f"Erro ao ler journalctl: {e}"})
+    
+@app.route("/fila")
+def status_fila():
+    agora = int(time.time())
+    proximos = []
+    for modo_regra, chave_db, intervalo_seg, rotulo, in REGRAS_AUTO:
+        ult = obter_config(chave_db, 0)
+        restante = max(0, (ult + intervalo_seg) - agora) if (intervalo_auto_min > 0 and ult > 0) else -1
+        proximos.append({"rotulo": rotulo, "modo": modo_regra, "restante_seg": restante})
+    return jsonify({
+        "auto_ativo": intervalo_auto_min > 0,
+        "rodando": robo_em_execucao,
+        "modo_atual": modo_atual or "Nenhuma (Servidor Livre)",
+        "fila": fila_varreduras,
+        "agendamentos": proximos
+    })
+
+@app.route("/limpar_fila", methods=["POST"])
+def limpar_fila():
+    fila_varreduras.clear()
+    return jsonify({"ok": True})
 
 if __name__ == "__main__":
     inicializar_banco()
-    intervalo_auto_min = obter_intervalo_auto()
+    intervalo_auto_min = obter_config("intervalo_auto", 0)
     app.run(host="0.0.0.0", port=5000)

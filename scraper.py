@@ -681,7 +681,7 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
             break
         
         cards = pagina.locator('div[data-component-type="s-search-result"]')
-        resultado_pag = cards.evaluate_all("""els => {
+        resultado_pag = cards.evaluate_all(r"""els => {
             let stats = { total: els.length, validos: 0, importados: 0, so_kindle: 0, sem_preco: 0};
             let itens = [];
             const bloqueados = [
@@ -760,7 +760,7 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
             
         st = resultado_pag["stats"]
         lista_bruta = resultado_pag["itens"]
-        print(f"   [Raio-X Pág {pagina_num}] {st['total']} cards na tela -> {st['validos']} físicos válidos | Ignorados: {st['importados']} Importados, {['so_kindle']} Só Kindle, {['sem_preco']} Esgotados/Sem preço.")
+        print(f"   [Raio-X Pág {pagina_num}] {st['total']} cards na tela -> {st['validos']} físicos válidos | Ignorados: {st['importados']} Importados, {st['so_kindle']} Só Kindle, {st['sem_preco']} Esgotados/Sem preço.")
         
         novos_na_pag = 0
         for item in lista_bruta:
