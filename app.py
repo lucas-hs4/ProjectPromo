@@ -227,7 +227,7 @@ def ocultar_item(produto_id):
 
 @app.route("/manifest.json")
 def pwa_manifest():
-    icone_svg = "data:image/svg+xml,<svg xmlns='http://www.wr.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%238257e5' /><text y='68' x='50' text-anchor='middle' font-size='55'>📚</text></svg>"
+    icone_svg = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%238257e5' /><text y='68' x='50' text-anchor='middle' font-size='55'>📚</text></svg>"
     return jsonify({
         "name": "Radar de Promoções HQs & Mangás",
         "short_name": "RadarPromo",

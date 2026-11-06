@@ -185,6 +185,7 @@ def extrair_vitrine_panini(pagina, url_inicial, max_paginas=100, urls_vistas=Non
                 print(f"Erro ao acessar a vitrine. Status: {resposta.status}")
                 break
             pagina.wait_for_selector("div.products-grid", timeout=30000)
+            pagina.wait_for_timeout(800)
         except Exception as erro:
             print(f"   [Erro de Rede] Pulo na Página {pagina_num} da Panini: {erro}")
             break
@@ -668,6 +669,7 @@ def extrair_vitrine_jbc(pagina, url_inicial, max_cliques=90, urls_vistas=None):
 def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_paginas=100, urls_vistas=None):
     """Crawler Turbo para buscar de Hqs/Mangás na Amazon Brasil."""
     url_atual = url_inicial
+    url_anterior = "https://www.amazon.com.br/"
     pagina_num = 1
     produtos_extraidos = []
     if urls_vistas is None:
@@ -687,11 +689,11 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
                 if resposta.status == 503:
                     espera_s = 30 + (tentativa_503 * 15)
                     print(f"   [Pausa Anti-503] Amazon pediu fôlego (tentativa {tentativa_503 + 1}/3). Renovando sessão e aguardando {espera_s}s...")
-                    pagina.context.clear_cookies()
+                    pagina.context.clear_cookies(domain=".amazon.com.br")
                     pagina.wait_for_timeout(espera_s * 1000)
                     try:
-                        pagina.goto("https://www.amazon.com.br/", wait_until="domcontent loaded", timeout=30000)
-                        pagina.wait_for_timeout(20000)
+                        pagina.goto("https://www.amazon.com.br/", wait_until="domcontentloaded", timeout=30000)
+                        pagina.wait_for_timeout(2000)
                     except Exception:
                         pass
                 else:
@@ -709,7 +711,7 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
         
         cards = pagina.locator('div[data-component-type="s-search-result"]')
         resultado_pag = cards.evaluate_all(r"""els => {
-            let stats = { total: els.length, validos: 0, importados: 0, so_kindle: 0, sem_preco: 0};
+            let stats = { total: els.length, validos: 0, importados: 0, so_kindle: 0, sem_preco: 0 };
             let itens = [];
             const bloqueados = [
                 'edição inglês', 'edição espanhol', 'edição italiano', 'edição francês',
@@ -733,34 +735,44 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
                 }
                 
                 const img = el.querySelector('img.s-image');
-                const links = Array.from(el.querySelectorAll('a'));
+                const nos = Array.from(el.querySelectorAll('a, span.a-price, span.a-color-base'));
+                let formatoAtual = '';
                 let linkFisico = null;
                 let precoTxt = '';
                 let antigoTxt = '';
+                let precoSecundarioTxt = '';
                 
-                for (const a of links) {
-                    const txt = a.innerText.trim().toLowerCase();
-                    if (formatosFisicos.includes(txt) && !a.href.toLowerCase().includes('-ebook/')) {
-                        linkFisico = a;
-                        let container = a.closest('.a-row, .puis-price-instructions-style, .a-section') || el;
-                        const spansPreco = Array.from(container.querySelectorAll('span.a-price'));
-                        for (const sp of spansPreco) {
-                            const off = sp.querySelector('.a-offscreen');
-                            if (!off) continue;
-                            if (sp.getAttribute('data-a-strike') === 'true'){
-                                if (!antigoTxt) antigoTxt = off.textContent;
-                            } else {
-                                if (!precoTxt) precoTxt = off.textContent;
-                            }
+                for (const no of nos) {
+                    if (no.tagName === 'A') {
+                        const txt = no.innerText.trim().toLowerCase();
+                        const href = (no.getAttribute('href') || '').toLowerCase();
+                        if (formatosFisicos.includes(txt) && !href.includes('-ebook/')) {
+                            formatoAtual = 'fisico';
+                            if (!linkFisico) linkFisico = no;
+                        } else if (
+                            txt.includes('kindle') || txt.includes('audiolivro') ||
+                            txt.includes('áudio') || txt.includes('audio') ||
+                            href.includes('-ebook/')
+                        ) {
+                            formatoAtual = 'digital';
                         }
-                        if (precoTxt) break;
+                    } else if (no.tagName === 'SPAN' && formatoAtual === 'fisico') {
+                        if (no.classList.contains('a-price')) {
+                            const off = no.querySelector('.a-offscreen');
+                            if (!off) continue;
+                            const val = off.textContent.trim();
+                            if (no.getAttribute('data-a-strike') === 'true') {
+                                if (!antigoTxt && val) antigoTxt = val;
+                            } else {
+                                if (!precoTxt && val) precoTxt = val;
+                            }
+                        } else if (!precoTxt && !precoSecundarioTxt && no.classList.contains('a-color-base')) {
+                            const m = (no.innerText || '').match(/R\$\s*\d{1,3}(?:\.\d{3})*,\d{2}/);
+                            if (m) precoSecundarioTxt = m[0];
+                        }
                     }
                 }
-                if (linkFisico && !precoTxt) {
-                    const textoCard = el.innerText || '';
-                    const matchPreco = textoCard.match(/R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})/);
-                    if (matchPreco) precoTxt = matchPreco[0];
-                }
+                if (!precoTxt && precoSecundarioTxt) precoTxt = precoSecundarioTxt;
                 
                 if (!linkFisico) {
                     stats.so_kindle++;
@@ -782,7 +794,7 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
                     prevenda: texto.includes('Pré-venda') || texto.includes('Será lançado')
                 });
             }
-        return { stats, itens };
+            return { stats, itens };
         }""")
             
         st = resultado_pag["stats"]

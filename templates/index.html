@@ -502,7 +502,7 @@
 
         async function ocultarCard(id, botao) {
             const resp = await fetch(`/ocultar/${id}`, { method: 'POST' });
-            if (respo.ok) {
+            if (resp.ok) {
                 const card = botao.closest('.card');
                 card.style.transition = '0.25s';
                 card.style.opacity = '0';

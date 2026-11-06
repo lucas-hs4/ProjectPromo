@@ -195,7 +195,7 @@ def executar_robo(modo="completo"):
                 "--disable-blink-features=AutomationControlled",
                 "--disable-gpu",
                 "--disable-dev-shm-usage",
-                "--no-zyogote"
+                "--no-zygote"
             ]
         )
         contexto = navegador.new_context(
