@@ -436,10 +436,10 @@ def listar_logs(limite=50):
     cursor = conexao.cursor(cursor_factory=RealDictCursor)
     cursor.execute("""
         SELECT
-             id, modo, total_lidos, status,
-             TO_CHAR(inicio, 'DD/MM/YYYY HH24:MI:SS') AS inicio_fmt,
-             COALESCE(TO_CHAR(fim, 'HH24:MI:SS'), '--:--:--') AS fim_fmt,
-             COALESCE(EXTRACT(EPOCH FROM (COALESCE(fim, CURRENT_TIMESTAMP) - inicio))::INTEGER, 0) AS duracao_seg
+            id, modo, total_lidos, status,
+            TO_CHAR(inicio, 'DD/MM/YYYY HH24:MI:SS') AS inicio_fmt,
+            COALESCE(TO_CHAR(fim, 'HH24:MI:SS'), '--:--:--') AS fim_fmt,
+            COALESCE(EXTRACT(EPOCH FROM (COALESCE(fim, CURRENT_TIMESTAMP) - inicio))::INTEGER, 0) AS duracao_seg
         FROM logs_varredura
         ORDER BY id DESC
         LIMIT %s;
@@ -465,6 +465,19 @@ def salvar_config(chave, valor):
         INSERT INTO configuracoes (chave, valor) VALUES (%s, %s)
         ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor;
     """, (chave, int(valor)))
+    conexao.commit()
+    cursor.close()
+    conexao.close()
+    
+def ocultar_produto(produto_id):
+    """Move um produto indesejado para a categoria Excluídos."""
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("""
+        UPDATE produtos
+        SET categoria = 'Excluídos', favorito = FALSE
+        WHERE id = %s;
+    """, (produto_id,))
     conexao.commit()
     cursor.close()
     conexao.close()

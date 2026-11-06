@@ -24,34 +24,50 @@ def identificar_editora(texto, padrao="Outras"):
         "demolidor", "wolverine", "lanterna verde", "mulher-maravilha", "deadpool", "spawn", "conan",
         "one piece", "chainsaw man", "jujutsu kaisen", "demon slayer", "kimetsu no yaiba", "berserk",
         "naruto", "dragon ball", "spy x family", "frieren", "dandadan", "blue lock", "vagabond",
-        "tokyo ghoul", "jojo's", "jojos", "bleach remix", "one-punch man", "sakamoto days", "kagurabachi",
+        "tokyo ghoul", "jojo's", "jojos", "jojo´s", "bleach remix", "one-punch man", "sakamoto days", "kagurabachi",
         "kusuriya", "diários de uma apotecária", "hanako-kun", "vinland saga", "atelier of witch hat",
-        "gachiakuta", "20th century boys", "pluto:", "monster kanzenban", "slam dunk", "mushoku tensei"
+        "gachiakuta", "20th century boys", "pluto:", "monster kanzenban", "slam dunk", "mushoku tensei",
+        "asa noturna", "detective comics", "ultimate collection", "caçador de marte", "cavaleiro da lua",
+        "dc x sonic", "vilania", "arqueiro verde", "spidey", "bungo stray dogs", "dorohedoro",
+        "undead unluck", "komi não consegue", "as quíntuplas", "granblue fantasy", "vampire knight",
+        "nisekoi", "mao vol", "we never learn", "yuuna e a pensão", "honey lemon soda", "witch watch",
+        "bug ego", "garota mágica dandelion", "black clover", "imperial vol", "claymore remix",
+        "capitão tsubasa", "tower dungeon", "hirayasumi", "tamon's b-side", "drcl", "gantz", "beastars"
     ]):
         return "Panini"
     elif any(p in t for p in [
         "jbc", "hunter x hunter", "haikyu", "fullmetal alchemist", "soul eater", "akira", "death note",
-        "cavaleiros do zodíaco", "saint seiya", "inuyasha", "cardcaptor sakura", "sailor moon",
+        "cavaleiros do zodíaco", "saint seiya", "inuyasha", "cardcaptor sakura", "card captor sakura", "sailor moon",
         "tokyo revengers", "my hero academia", "boku no hero", "yona", "alice in borderland",
         "fire punch", "blame!", "hellsing", "shaman king", "boa noite punpun", "yomi no tsugai",
-        "xxxholic", "rayearth", "nausicaä", "blade - a lâmina", "astro boy", "bakuman", "zom 100"
+        "xxxholic", "rayearth", "nausicaä", "blade - a lâmina", "astro boy", "bakuman", "zom 100",
+        "nana vol", "the fable", "parasyte", "skip & loafer", "medalist", "reincarnated as a slime",
+        "edens zero", "final fantasy lost stranger", "dead dead demons", "fruits basket", "buda - vol",
+        "kamen rider", "shimanami tasogare", "boys run the riot", "sem saída", "yu yu hakusho",
+        "akane banashi", "bendaora", "sanctuary vol", "ghost in the shell", "dragon quest"
     ]):
         return "JBC"
     elif any(p in t for p in [
-        "newpop", "new pop", "re:zero", "solo leveling", "mo dao zu shi", "bênção do oficial",
+        "newpop", "new pop", "re:zero", "re: zero", "solo leveling", "mo dao zu shi", "bênção do oficial",
         "sistema de autopreservação", "ashita no joe", "terra das gemas", "houseki no kuni",
         "given", "uma vida imortal", "to your eternity", "record of ragnarok", "shuumatsu",
-        "a voz do silêncio", "semantic error", "um sinal de afeto", "mushishi", "toradora", "made in abyss"
+        "a voz do silêncio", "semantic error", "um sinal de afeto", "mushishi", "toradora", "made in abyss",
+        "beginning after the end", "melhor engenheiro do mundo", "greatest estate developer",
+        "dangerous convenience store", "king's maker", "pink heart jam", "destino dos vilões",
+        "classroom of the elite", "no game no life", "citrus", "fuja comigo, garota"
     ]):
         return "NewPOP"
     elif any(p in t for p in [
         "pipoca", "nanquim", "junji ito", "tomie", "uzumaki", "gyo", "shigurui", "incal",
-        "tartarugas ninja", "último ronin", "lobo solitário", "chushingura", "city hunter", "cat's eye", "cão de caça"
+        "tartarugas ninja", "último ronin", "lobo solitário", "chushingura", "city hunter", "cat's eye", "cão de caça",
+        "the boys", "calafrios", "a lagarta", "ptsd radio", "harem end", "o vampiro que ri",
+        "anamorfose", "kanikosen", "lady snowblood", "elric", "eternauta", "thorgal"
     ]):
         return "Pipoca & Nanquim"
     elif any(p in t for p in [
         "mpeg", "gash bell", "beck", "kaoru hana", "hajime no ippo", "sense life",
-        "creamy mami", "nodame cantabile", "omori", "dusk maiden", "10 dance", "como conquistar um alfa"
+        "creamy mami", "nodame cantabile", "omori", "dusk maiden", "10 dance", "como conquistar um alfa",
+        "casamento dos vaga-lumes", "tenkaichi", "gto -"
     ]):
         return "MPEG"
     return padrao if padrao in ["Panini", "JBC", "NewPOP", "Pipoca & Nanquim", "MPEG"] else "Outras"

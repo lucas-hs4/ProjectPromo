@@ -190,7 +190,13 @@ def executar_robo(modo="completo"):
             
         navegador = p.chromium.launch(
             headless=True,
-            args=["--headless=new", "--disable-blink-features=AutomationControlled"]
+            args=[
+                "--headless=new",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+                "--no-zyogote"
+            ]
         )
         contexto = navegador.new_context(
             locale="pt-BR",

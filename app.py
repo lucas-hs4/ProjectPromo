@@ -5,7 +5,7 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 from database import (
     inicializar_banco, listar_ofertas, alternar_favorito,
     buscar_historico_produto, definir_preco_alvo, conectar,
-    definir_titulo_editado, listar_logs, obter_config, salvar_config
+    definir_titulo_editado, listar_logs, obter_config, salvar_config, ocultar_produto
 )
 from main import executar_robo
 
@@ -18,7 +18,7 @@ intervalo_auto_min = 0
 
 REGRAS_AUTO = [
     ("rapido", "ult_wishlist", 3 * 3600, " Wishlist (3h)"),
-    ("Amazon", "ult_amazon", 4 * 3600, " Amazon (4h)"),
+    ("Amazon", "ult_amazon", 5 * 3600, " Amazon (5h)"),
     ("Mercado Livre", "ult_ml", 3 * 3600, " Mercado Livre (3h)"),
     ("Editoras", "ult_editoras", 72 * 3600, " Editoras (3 dias)")
 ]
@@ -219,6 +219,28 @@ def status_fila():
 def limpar_fila():
     fila_varreduras.clear()
     return jsonify({"ok": True})
+
+@app.route("/ocultar/<int:produto_id>", methods=["POST"])
+def ocultar_item(produto_id):
+    ocultar_produto(produto_id)
+    return jsonify({"ok": True})
+
+@app.route("/manifest.json")
+def pwa_manifest():
+    icone_svg = "data:image/svg+xml,<svg xmlns='http://www.wr.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%238257e5' /><text y='68' x='50' text-anchor='middle' font-size='55'>📚</text></svg>"
+    return jsonify({
+        "name": "Radar de Promoções HQs & Mangás",
+        "short_name": "RadarPromo",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#09090b",
+        "theme_color": "#13111c",
+        "icons": [{"src": icone_svg, "sizes": "192x192 512x512", "type": "image/svg+xml", "purpose": "any maskable"}]
+    })
+    
+@app.route("/sw.js")
+def pwa_sw():
+    return app.response_class("self.addEventListener('fetch', function(e) {});", mimetype="application/javascript")
 
 if __name__ == "__main__":
     inicializar_banco()
