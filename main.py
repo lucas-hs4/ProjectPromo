@@ -10,7 +10,7 @@ from database import inicializar_banco, salvar_leitura, atualizar_status_alerta,
 from notificador import enviar_alerta_ntfy
 import ctypes
 
-DESCONTO_MINIMO_WISHLIST = 20
+DESCONTO_MINIMO_WISHLIST = 25
 DESCONTO_MINIMO_PCT = 70
 
 VITRINES_MONITORADAS = [
@@ -195,13 +195,13 @@ def executar_robo(modo="completo"):
         contexto = navegador.new_context(
             locale="pt-BR",
             viewport={"width": 1366, "height": 768},
-            user_agent=ua_padrao,
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
             storage_state=arquivo_sessao
         )
-        contexto.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined}); Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});")
+        contexto.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
         
         pagina = contexto.new_page()
-        pagina.route("**/*", lambda route: route.abort() if (route.request.resource_type in ["image", "media", "font"] and "mercadolivre" not in route.request.url) else route.continue_())
+        pagina.route("**/*", lambda route: route.abort() if (route.request.resource_type in ["image", "media"] and "mercadolivre" not in route.request.url) else route.continue_())
         
         urls_ja_varridas = set()
         

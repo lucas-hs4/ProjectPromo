@@ -18,7 +18,7 @@ intervalo_auto_min = 0
 
 REGRAS_AUTO = [
     ("rapido", "ult_wishlist", 3 * 3600, " Wishlist (3h)"),
-    ("Amazon", "ult_amazon", 3 * 3600, " Amazon (3h)"),
+    ("Amazon", "ult_amazon", 4 * 3600, " Amazon (4h)"),
     ("Mercado Livre", "ult_ml", 3 * 3600, " Mercado Livre (3h)"),
     ("Editoras", "ult_editoras", 72 * 3600, " Editoras (3 dias)")
 ]

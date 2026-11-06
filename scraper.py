@@ -1,3 +1,4 @@
+import random
 import json
 from playwright.sync_api import sync_playwright
 
@@ -656,6 +657,8 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
     if urls_vistas is None:
         urls_vistas = set()
         
+    pagina.wait_for_timeout(random.randint(4000, 7000))
+        
     while url_atual and pagina_num <= max_paginas:
         if cancelar_varredura:
             break
@@ -664,18 +667,26 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
         try:
             resposta = None
             for tentativa_503 in range(3):
-                resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000)
+                resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000, referer=url_anterior)
                 if resposta.status == 503:
-                    print(f"   [Pausa Anti-503] Amazon pediu fôlego (tentativa {tentativa_503 + 1}/3). Aguardando 20s...")
-                    pagina.wait_for_timeout(20000)
+                    espera_s = 30 + (tentativa_503 * 15)
+                    print(f"   [Pausa Anti-503] Amazon pediu fôlego (tentativa {tentativa_503 + 1}/3). Renovando sessão e aguardando {espera_s}s...")
+                    pagina.context.clear_cookies()
+                    pagina.wait_for_timeout(espera_s * 1000)
+                    try:
+                        pagina.goto("https://www.amazon.com.br/", wait_until="domcontent loaded", timeout=30000)
+                        pagina.wait_for_timeout(20000)
+                    except Exception:
+                        pass
                 else:
                     break
             if not resposta or resposta.status != 200:
-                print(f"   [Fim do Link] Erro aoa acessar Amazon na Página {pagina_num}. Status: {resposta.status if resposta else 'Sem resposta'}")
+                print(f"   [Fim do Link] Erro ao acessar Amazon na Página {pagina_num}. Status: {resposta.status if resposta else 'Sem resposta'}")
                 break
             pagina.wait_for_selector('div[data-component-type="s-search-result"]', timeout=25000)
             pagina.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            pagina.wait_for_timeout(2000)
+            pagina.wait_for_timeout(random.randint(3500, 6000))
+            url_anterior = url_atual
         except Exception as erro:
             print(f"   [Fim do Link] Página {pagina_num} não carregou cards (possível Captcha ou fim dos resultados): {erro}")
             break
@@ -807,7 +818,7 @@ def extrair_vitrine_amazon(pagina, url_inicial, editora_padrao="Outras", max_pag
                 url_atual += f"&i=stripbooks&{rh_original}"
             pagina_num += 1
         else:
-            motivo = "Limite de páginas atingido" if pagina_num >= max_paginas else "Última página da ctegoria atingida (botão Próximo desativado)"
+            motivo = "Limite de páginas atingido" if pagina_num >= max_paginas else "Última página da categoria atingida (botão Próximo desativado)"
             print(f"   [Fim do Link] Paginação encerrada na Página: {pagina_num}: {motivo}.")
             url_atual = None
         
@@ -884,23 +895,31 @@ def extrair_vitrine_mercadolivre(pagina, url_inicial, editora_padrao="Panini", m
     produtos_extraidos = []
     if urls_vistas is None:
         urls_vistas = set()
+    urls_ml_sessao = set()
+    
+    print(f"\n[Mercado Livre • {editora_padrao}] Varrendo Página 1: {url_inicial}...")
+    try:
+        resposta = pagina.goto(url_inicial, wait_until="domcontentloaded", timeout=60000)
+        if not resposta or resposta.status != 200:
+            print(f"Erro ao acessar Mercado Livre. Status: {resposta.status if resposta else 'Sem resposta'}")
+            return produtos_extraidos
+    except Exception as erro:
+        print(f"   [Aviso ML] Falha ao abrir link inicial: {erro}")
+        return produtos_extraidos
 
-    while url_atual and pagina_num <= max_paginas:
+    while pagina_num <= max_paginas:
         if cancelar_varredura:
             break
-        print(f"\n[Mercado Livre • {editora_padrao}] Varrendo Página {pagina_num}: {url_atual}...")
 
         try:
-            resposta = pagina.goto(url_atual, wait_until="domcontentloaded", timeout=60000)
-            if resposta.status != 200:
-                print(f"Erro ao acessar Mercado Livre. Status: {resposta.status}")
-                break
             pagina.wait_for_selector("div.poly-card, li.ui-search-layout__item, div.ui-search-result", state="attached", timeout=20000)
+            pagina.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            pagina.wait_for_timeout(2000)
         except Exception as erro:
             print(f"   [Aviso ML] Bloqueio ou página vazia ({pagina.title()} -> {pagina.url})")
             break
 
-        cards = pagina.locator("div.poly-card, li.ui-search-layout__item")
+        cards = pagina.locator("li.ui-search-layout__item, div.poly-card:not(li.ui-search-layout__item *)")
         lista_bruta = cards.evaluate_all("""els => els.map(el => {
             const link = el.querySelector('a.poly-component__title') || el.querySelector('h2 a') || el.querySelector('a.ui-search-link') || el.querySelector('a');
             const img = el.querySelector('img.poly-component__picture') || el.querySelector('img');
@@ -920,9 +939,15 @@ def extrair_vitrine_mercadolivre(pagina, url_inicial, editora_padrao="Panini", m
         })""")
         print(f"Encontrados {len(lista_bruta)} itens nesta página do Mercado Livre.")
 
+        novos_neste_lote = 0
         for item in lista_bruta:
-            if not item["url"] or not item["nome"] or item["url"] in urls_vistas:
+            if not item["url"] or not item["nome"]:
                 continue
+            if item ["url"] not in urls_ml_sessao:
+                urls_ml_sessao.add(item["url"])
+                novos_neste_lote += 1
+                if item["url"] in urls_vistas:
+                    continue
             urls_vistas.add(item["url"])
 
             preco_atual = limpar_preco_br(item["preco_txt"])
@@ -946,13 +971,47 @@ def extrair_vitrine_mercadolivre(pagina, url_inicial, editora_padrao="Panini", m
                 "status": "Em estoque" if preco_atual > 0 else "Indisponível",
                 "disponivel": preco_atual > 0
             })
-
-        botao_prox = pagina.locator("li.andes-pagination__button--next:not(.andes-pagination__button--disabled) a").first
-        if botao_prox.count() > 0 and pagina_num < max_paginas:
-            url_atual = botao_prox.get_attribute("href")
+            
+        if pagina_num > 1 and novos_neste_lote == 0:
+            print(f"   [Fim do Link ML] Nenhum anúncio inédito na Página {pagina_num}. Passando para o próximo link!")
+            break
+        
+        if pagina_num >= max_paginas:
+            print(f"   [Fim do Link ML] Limite de {max_paginas} páginas atingido.")
+            break
+        
+        botao_prox = pagina.locator(
+            "li.andes-pagination__button--next:not(.andes-pagination__button--disabled) a, "
+            "li.andes-pagination__button--next:not(.andes-pagination__button--disabled) button, "
+            "a.andes-pagination__link[title='Seguinte']:not([aria-disabled='true']), "
+            "a.andes-pagination__link:has-text('Seguinte'):not([aria-disabled='true'])"
+        ).first
+        
+        try:
+            botao_prox.scroll_into_view_if_needed(timeout=5000)
+            pagina.wait_for_timeout(500)
+            prox_href = botao_prox.get_attribute("href")
             pagina_num += 1
-        else:
-            url_atual = None
+            
+            if prox_href and not prox_href.startswith("#") and not prox_href.startswith("javascript"):
+                url_prox = prox_href if prox_href.startswith("http") else f"https://lista.mercadolivre.com.br{prox_href}"
+                print(f"\n[Mercado Livre • {editora_padrao}] Varrendo Página {pagina_num}: {url_prox}...")
+                pagina.goto(url_prox, wait_until="domcontentloaded", timeout=60000)
+            else:
+                primeiro_antes = lista_bruta[0]["url"] if lista_bruta else ""
+                print(f"\n[Mercado Livre • {editora_padrao}] Varrendo Página {pagina_num} (clicando em 'Seguinte')...")
+                botao_prox.click(force=True)
+                for _ in range(20):
+                    pagina.wait_for_timeout(500)
+                    primeiro_agora = pagina.evaluate("""() => {
+                        const el = document.querySelector('li.ui-search-layout__item a, div.poly-card a');
+                        return el ? el.href.split('#')[0].split('?')[0] : '';
+                    }""")
+                    if primeiro_agora and primeiro_agora != primeiro_antes:
+                        break
+        except Exception as erro:
+            print(f"   [Fim do Link ML] Paginação encerrada na Página {pagina_num}: {erro}")
+            break
 
     return produtos_extraidos
 
